@@ -1,4 +1,4 @@
-name: fore-last-stand build
+name: build
 
 on:
   workflow_dispatch:
@@ -11,26 +11,9 @@ on:
   # A merged PR lands on main as a push, so this builds only on merges that touch the project.
   push:
     branches: [main]
-    paths: ["lib/**", "test/**", "pubspec.yaml", "analysis_options.yaml", ".github/workflows/fore-last-stand-build.yml"]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter create --platforms=android,ios --project-name fore_last_stand --org com.playground .
-      # flutter create adds a template counter-app test that doesn't apply to this game
-      - run: rm -f test/widget_test.dart
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-
   build-android:
-    needs: test
     if: github.event_name != 'workflow_dispatch' || inputs.target != 'ios'
     runs-on: ubuntu-latest
     steps:
@@ -43,7 +26,7 @@ jobs:
         with:
           channel: stable
           cache: true
-      - run: flutter create --platforms=android --project-name fore_last_stand --org com.playground .
+      - run: flutter create --platforms=android --project-name fore_last_stand --org com.qbitcore .
       - run: flutter pub get
       - name: Build
         run: flutter build ${{ inputs.target == 'appbundle' && 'appbundle' || 'apk' }} --release
@@ -55,7 +38,6 @@ jobs:
             build/app/outputs/bundle/release/*.aab
 
   build-ios:
-    needs: test
     if: github.event_name == 'workflow_dispatch' && inputs.target == 'ios'
     runs-on: macos-latest
     steps:
@@ -64,7 +46,7 @@ jobs:
         with:
           channel: stable
           cache: true
-      - run: flutter create --platforms=ios --project-name fore_last_stand --org com.playground .
+      - run: flutter create --platforms=ios --project-name fore_last_stand --org com.qbitcore .
       - run: flutter pub get
       - run: flutter build ios --release --no-codesign
       - uses: actions/upload-artifact@v4

@@ -295,6 +295,7 @@ void main() {
       b.toggleSelect(t);
       clearHole(b);
       expect(b.selectedTower, t);
+      b.pickPerk(0); // drafting -> building, so selling is allowed again
       b.sellTower(t);
       expect(b.selectedTowerId, isNull);
     });
