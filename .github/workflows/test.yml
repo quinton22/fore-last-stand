@@ -1,4 +1,4 @@
-name: fore-last-stand build
+name: test
 
 on:
   pull_request:
