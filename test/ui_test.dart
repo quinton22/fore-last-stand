@@ -38,4 +38,26 @@ void main() {
     expect(find.text('FORE!'), findsOneWidget);
     expect(find.text('Driver'), findsOneWidget);
   });
+
+  testWidgets('first run pauses on the how-to-play dialog', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    final store = ProfileStore(Profile());
+    await tester.pumpWidget(ForeApp(store: store));
+    await tester.tap(find.text('Quick Round'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Defend the clubhouse'), findsOneWidget);
+    expect(store.profile.tutorialSeen, contains('intro'));
+    await tester.tap(find.text('Skip'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Defend the clubhouse'), findsNothing);
+  });
+
+  testWidgets('home has a how-to-play button', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1000));
+    await tester.pumpWidget(ForeApp(store: ProfileStore(Profile())));
+    await tester.tap(find.text('How to play'));
+    await tester.pumpAndSettle();
+    expect(find.text('Defend the clubhouse'), findsOneWidget);
+  });
 }

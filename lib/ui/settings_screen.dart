@@ -44,6 +44,14 @@ class SettingsScreen extends StatelessWidget {
                 value: s.screenShake,
                 onChanged: (v) => store.update((p) => p.settings.screenShake = v),
               ),
+              ListTile(
+                title: const Text('Replay tutorial tips'),
+                subtitle: const Text('Show the how-to-play and enemy introductions again'),
+                onTap: () {
+                  store.update((p) => p.tutorialSeen.clear());
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tips will show again next round.')));
+                },
+              ),
               const ListTile(title: Text('Gore')),
               RadioGroup<GoreLevel>(
                 groupValue: s.gore,

@@ -13,6 +13,7 @@ import '../sim/combo.dart';
 import '../sim/entities.dart';
 import '../sim/vec.dart';
 import 'results_screen.dart';
+import 'tutorial.dart';
 
 class RunScreen extends StatefulWidget {
   const RunScreen({super.key, required this.store, required this.config});
@@ -30,11 +31,14 @@ class _RunScreenState extends State<RunScreen> {
   Offset? _dragStart;
   bool _paused = false;
   bool _ended = false;
+  bool _tutorialOpen = false;
 
   @override
   void initState() {
     super.initState();
     game.hudTick.addListener(_onTick);
+    // The engine is not ticking yet, so check for the intro right away.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkTutorial());
   }
 
   @override
@@ -47,7 +51,32 @@ class _RunScreenState extends State<RunScreen> {
     if (battle.finished && !_ended) {
       _ended = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _finish());
+      return;
     }
+    if (!_tutorialOpen && !_paused && pendingTutorialTopic(battle, widget.store.profile) != null) {
+      _tutorialOpen = true; // claimed now so the next tick does not queue a second dialog
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkTutorial());
+    }
+  }
+
+  /// Pauses the game and explains whatever the player has not seen yet.
+  Future<void> _checkTutorial() async {
+    if (!mounted || battle.finished || _paused || pendingTutorialTopic(battle, widget.store.profile) == null) {
+      _tutorialOpen = false;
+      return;
+    }
+    _tutorialOpen = true;
+    game.pauseEngine();
+    _dragStart = null;
+    game.aimDrag = null;
+    battle.cancelSwing();
+    String? topic;
+    while (mounted && (topic = pendingTutorialTopic(battle, widget.store.profile)) != null) {
+      widget.store.update((p) => p.tutorialSeen.add(topic!));
+      await showTutorialTopic(context, topic!);
+    }
+    _tutorialOpen = false;
+    if (mounted && !_paused) game.resumeEngine();
   }
 
   void _finish() {
@@ -147,7 +176,7 @@ class _RunScreenState extends State<RunScreen> {
                       ),
                     if (_paused)
                       Positioned.fill(
-                        child: _PauseMenu(onResume: _resume, onQuit: _quit),
+                        child: _PauseMenu(onResume: _resume, onQuit: _quit, onHelp: () => showHowToPlay(context)),
                       ),
                   ],
                 ),
@@ -617,8 +646,9 @@ class _TowerSheet extends StatelessWidget {
 }
 
 class _PauseMenu extends StatelessWidget {
-  const _PauseMenu({required this.onResume, required this.onQuit});
+  const _PauseMenu({required this.onResume, required this.onQuit, required this.onHelp});
 
+  final VoidCallback onHelp;
   final VoidCallback onResume;
   final VoidCallback onQuit;
 
@@ -638,6 +668,8 @@ class _PauseMenu extends StatelessWidget {
           Text('Combo rungs: ${ComboLadder.rungNames.join(' → ')}', style: const TextStyle(color: Colors.white60, fontSize: 12)),
           const SizedBox(height: 20),
           FilledButton(onPressed: onResume, child: const Text('Resume')),
+          const SizedBox(height: 8),
+          OutlinedButton(onPressed: onHelp, child: const Text('How to play')),
           const SizedBox(height: 8),
           TextButton(
             onPressed: onQuit,

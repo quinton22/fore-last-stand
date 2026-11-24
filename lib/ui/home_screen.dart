@@ -9,6 +9,7 @@ import 'caddies_screen.dart';
 import 'clubhouse_screen.dart';
 import 'run_screen.dart';
 import 'settings_screen.dart';
+import 'tutorial.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.store});
@@ -69,6 +70,13 @@ class HomeScreen extends StatelessWidget {
                     padding: EdgeInsets.all(8),
                     child: Text('New here? Start with a Quick Round.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
                   ),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () => showHowToPlay(context),
+                    icon: const Icon(Icons.help_outline, color: Colors.white),
+                    label: const Text('How to play', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   alignment: WrapAlignment.center,
