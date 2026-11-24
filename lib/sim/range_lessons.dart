@@ -23,7 +23,7 @@ class RangeLesson {
 }
 
 final List<RangeLesson> rangeLessons = [
-  RangeLesson(
+  const RangeLesson(
     title: 'Welcome to the Driving Range',
     body: 'A virus has turned the course\'s animals into zombies and you are the last person standing at the clubhouse. '
         'This range is where you learn to fight back. Nothing here can hurt you, and you can leave any time.',
