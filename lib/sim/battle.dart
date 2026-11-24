@@ -24,6 +24,12 @@ const Box clubhouseBox = Box(112, 604, 248, 640);
 /// Plots live in this zone around the clubhouse (spec 4).
 const Box baseZone = Box(24, 420, 336, 580);
 
+/// Seconds a Sweet Spot swing overcharges the selected tower.
+const double sweetChargeSeconds = 3;
+
+/// Extra seconds a Fore! burst keeps the selected tower charged after it ends.
+const double foreChargeTail = 1;
+
 enum Phase { playing, drafting, building, won, lost }
 
 /// Everything a run needs from the menu and the player's profile.
@@ -243,6 +249,22 @@ class Battle {
     return (col, row);
   }
 
+  /// Id of the tower that Sweet Spot swings and Fore! bursts charge, if any.
+  /// Persists between holes; a new [Battle] (run) starts with none.
+  int? selectedTowerId;
+
+  Tower? get selectedTower {
+    final id = selectedTowerId;
+    if (id == null) return null;
+    for (final t in towers) {
+      if (t.id == id && !t.removed) return t;
+    }
+    return null;
+  }
+
+  /// Taps select a tower; tapping the selected one deselects it. Only one at a time.
+  void toggleSelect(Tower t) => selectedTowerId = selectedTowerId == t.id ? null : t.id;
+
   Tower? towerAt(int col, int row) {
     for (final t in towers) {
       if (!t.removed && t.col == col && t.row == row) return t;
@@ -316,6 +338,7 @@ class Battle {
     final refund = refundFor(t);
     coins += refund;
     towers.remove(t);
+    if (selectedTowerId == t.id) selectedTowerId = null;
     return refund;
   }
 
@@ -346,7 +369,7 @@ class Battle {
     say(CommentEvent.holeStart);
     if (hole.hasBoss) say(CommentEvent.bossArrives, force: true);
     if (config.tutorial && holeIndex == 0) hint = 'Drag back anywhere and release to swing!';
-    if (config.tutorial && holeIndex == 3) hint = 'Bank a ball off your own tower to overcharge it.';
+    if (config.tutorial && holeIndex == 3) hint = 'Tap a tower to select it, then land a Sweet Spot to overcharge it.';
   }
 
   HoleSpec _holeFor(int index) {
@@ -513,6 +536,7 @@ class Battle {
       damage *= sweetSpotDamageMultiplier + perkSum(PerkEffect.sweetSpotDamage);
       shake = 0.25;
       fx.add(Fx(FxKind.sweet, [teePosition], ttl: 0.35, radius: 30, colorValue: 0xFF76FF03));
+      if (!auto) _chargeSelected(sweetChargeSeconds);
       say(CommentEvent.sweetSpot);
     }
     if (auto) damage *= 0.6;
@@ -551,6 +575,7 @@ class Battle {
     _foreVolley = 0;
     shake = 0.3;
     say(CommentEvent.foreBurst, force: true);
+    _chargeSelected(foreTimer + foreChargeTail);
     return true;
   }
 
@@ -931,7 +956,7 @@ class Battle {
       if (!t.active) continue;
       final over = t.overcharge > 0;
       final lvl = towerLevelMultiplier(t.level);
-      t.cooldown -= dt * rate * (over && t.spec.kind == TowerKind.ballMachine ? 2.5 : 1);
+      t.cooldown -= dt * rate * (over ? (t.spec.kind == TowerKind.ballMachine ? 2.5 : t.spec.kind == TowerKind.sniper ? 2 : 1) : 1);
       switch (t.spec.kind) {
         case TowerKind.ballMachine:
           if (t.cooldown > 0) break;
@@ -1017,10 +1042,13 @@ class Battle {
     }
   }
 
-  /// A ball hit one of the player's towers: overcharge it (spec 3/4).
-  void _tagTower(Tower t, Ball b) {
-    t.overcharge = 3 + perkSum(PerkEffect.overchargeDuration);
-    if (t.spec.kind == TowerKind.cartCannon && b.sweet) t.cooldown = 0;
+  /// Charges only the selected tower (spec 3/4). Balls pass through towers, so
+  /// charging comes from Sweet Spot swings and Fore! bursts instead.
+  void _chargeSelected(double seconds) {
+    final t = selectedTower;
+    if (t == null) return;
+    t.overcharge = math.max(t.overcharge, seconds + perkSum(PerkEffect.overchargeDuration));
+    if (t.spec.kind == TowerKind.cartCannon) t.cooldown = 0;
     fx.add(Fx(FxKind.sweet, [t.pos], ttl: 0.3, radius: towerRadius + 8, colorValue: 0xFFFFEB3B));
     if (_tagCommentCooldown <= 0) {
       _tagCommentCooldown = 6;
@@ -1069,8 +1097,6 @@ class Battle {
         b.pos = b.pos + b.vel * step;
         _ballWalls(b);
         if (b.done) break;
-        _ballTowers(b);
-        if (b.done) break;
         _ballEnemies(b);
       }
     }
@@ -1088,26 +1114,6 @@ class Battle {
     }
     const m = 30.0;
     if (b.pos.x < -m || b.pos.x > worldWidth + m || b.pos.y < -m || b.pos.y > worldHeight + m) _endBall(b);
-  }
-
-  void _ballTowers(Ball b) {
-    if (b.mega) return;
-    for (final t in towers) {
-      if (t.removed || t.id == b.lastTowerId) continue;
-      final d = b.pos - t.pos;
-      if (d.length > towerRadius + b.radius) continue;
-      b.lastTowerId = t.id;
-      _tagTower(t, b);
-      if (b.bounces > 0) {
-        b.bounces--;
-        final n = d.normalized();
-        b.vel = b.vel.reflect(n);
-        b.pos = t.pos + n * (towerRadius + b.radius + 0.5);
-      } else {
-        _endBall(b);
-      }
-      return;
-    }
   }
 
   void _ballEnemies(Ball b) {
@@ -1179,9 +1185,6 @@ class Battle {
       hitAny = true;
       damageEnemy(e, b.damage);
       _onHitPerks(b, at, e);
-    }
-    for (final t in towers) {
-      if (!t.removed && t.pos.distanceTo(at) < towerRadius + 6) _tagTower(t, b);
     }
     if (hitAny) {
       b.hitSomething = true;

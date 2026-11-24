@@ -81,7 +81,6 @@ class Ball {
   bool hitSomething = false;
   bool done = false;
   final Set<int> hitIds = {};
-  int lastTowerId = -1;
 
   // Wedge lob.
   V2? lobStart;
