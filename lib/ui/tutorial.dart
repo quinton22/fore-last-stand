@@ -105,7 +105,8 @@ List<TutorialPage> howToPlayPages() => [
         bullets: [
           'Higher rungs multiply the coins you earn.',
           'Fill the Fore! meter, then tap FORE! for a 3-second barrage of balls.',
-          'Balls ricochet off walls, enemies and your own towers. Bouncing a ball off a tower overcharges it.',
+          'Balls ricochet off walls and enemies, but pass straight through your own towers.',
+          'Tap a tower to select it. Your Sweet Spot hits and Fore! bursts then overcharge it. Tap again to deselect.',
         ],
       ),
       TutorialPage(
@@ -115,7 +116,7 @@ List<TutorialPage> howToPlayPages() => [
         bullets: [
           'Between holes, tap a plot to build, then press Tee Off to start the next hole.',
           'Building mid-hole costs double and briefly slows time.',
-          'Tap a tower to upgrade it (3 levels) or sell it for 70% back. You get free re-placement for the first 10 seconds.',
+          'Long-press a tower to upgrade it (3 levels) or sell it for 70% back. You get free re-placement for the first 10 seconds.',
           'Sprinkler + Tee-Tesla next to each other unlock a pair bonus.',
           for (final t in towers) '${t.name} (🪙${t.cost}): ${t.role}',
         ],
@@ -159,7 +160,7 @@ List<TutorialPage> _buildPages() => [
         'Between holes the action stops so you can set up.',
         bullets: [
           'Tap a glowing plot to place a tower. Coins are shown at the top.',
-          'Tap a built tower to upgrade or sell it.',
+          'Long-press a built tower to upgrade or sell it. A plain tap selects it for overcharging.',
           'Press Tee Off when you are ready for the next hole.',
           for (final t in towers) '${t.name} (🪙${t.cost}): ${t.role}. ${t.synergy}',
         ],
