@@ -24,11 +24,16 @@ const Box clubhouseBox = Box(112, 604, 248, 640);
 /// Plots live in this zone around the clubhouse (spec 4).
 const Box baseZone = Box(24, 420, 336, 580);
 
-/// Seconds a Sweet Spot swing overcharges the selected tower.
-const double sweetChargeSeconds = 3;
+/// Seconds sinking a ball in a flag's hole overcharges every tower.
+const double flagBoostSeconds = 4;
 
-/// Extra seconds a Fore! burst keeps the selected tower charged after it ends.
-const double foreChargeTail = 1;
+/// Seconds a flag stays up, and the gap range between flags.
+const double flagLifetime = 7;
+const double flagMinGap = 8;
+const double flagMaxGap = 14;
+
+/// Radius of a flag's hole.
+const double flagRadius = 18;
 
 enum Phase { playing, drafting, building, won, lost }
 
@@ -106,6 +111,7 @@ class RunResult {
 class Battle {
   Battle(this.config)
       : rng = math.Random(config.seed),
+        _flagRng = math.Random(config.seed * 31 + 7),
         flags = config.mode.flags,
         coins = config.startingCoins {
     commentator = Commentator(rng.nextInt);
@@ -249,21 +255,10 @@ class Battle {
     return (col, row);
   }
 
-  /// Id of the tower that Sweet Spot swings and Fore! bursts charge, if any.
-  /// Persists between holes; a new [Battle] (run) starts with none.
-  int? selectedTowerId;
-
-  Tower? get selectedTower {
-    final id = selectedTowerId;
-    if (id == null) return null;
-    for (final t in towers) {
-      if (t.id == id && !t.removed) return t;
-    }
-    return null;
-  }
-
-  /// Taps select a tower; tapping the selected one deselects it. Only one at a time.
-  void toggleSelect(Tower t) => selectedTowerId = selectedTowerId == t.id ? null : t.id;
+  /// Flags/holes currently up. Landing a ball in one overcharges every tower.
+  final List<Pin> pins = [];
+  final math.Random _flagRng;
+  double _flagTimer = 0;
 
   Tower? towerAt(int col, int row) {
     for (final t in towers) {
@@ -338,7 +333,6 @@ class Battle {
     final refund = refundFor(t);
     coins += refund;
     towers.remove(t);
-    if (selectedTowerId == t.id) selectedTowerId = null;
     return refund;
   }
 
@@ -362,6 +356,8 @@ class Battle {
   void _startHole() {
     hole = _holeFor(holeIndex);
     holeTime = 0;
+    pins.clear();
+    _flagTimer = flagMinGap;
     _queue
       ..clear()
       ..addAll(scheduleHole(hole, math.Random(config.seed * 7919 + holeIndex), countScale: swarmScale * config.enemyCountScale));
@@ -369,7 +365,7 @@ class Battle {
     say(CommentEvent.holeStart);
     if (hole.hasBoss) say(CommentEvent.bossArrives, force: true);
     if (config.tutorial && holeIndex == 0) hint = 'Drag back anywhere and release to swing!';
-    if (config.tutorial && holeIndex == 3) hint = 'Tap a tower to select it, then land a Sweet Spot to overcharge it.';
+    if (config.tutorial && holeIndex == 3) hint = 'Sink a ball in a flag to overcharge all your towers.';
   }
 
   HoleSpec _holeFor(int index) {
@@ -395,6 +391,7 @@ class Battle {
 
   void _holeCleared() {
     holesCleared++;
+    pins.clear();
     var bonus = hole.coinBonus;
     if (holeTime <= hole.par) {
       bonus += 10 + 2 * holeIndex;
@@ -536,7 +533,6 @@ class Battle {
       damage *= sweetSpotDamageMultiplier + perkSum(PerkEffect.sweetSpotDamage);
       shake = 0.25;
       fx.add(Fx(FxKind.sweet, [teePosition], ttl: 0.35, radius: 30, colorValue: 0xFF76FF03));
-      if (!auto) _chargeSelected(sweetChargeSeconds);
       say(CommentEvent.sweetSpot);
     }
     if (auto) damage *= 0.6;
@@ -575,7 +571,6 @@ class Battle {
     _foreVolley = 0;
     shake = 0.3;
     say(CommentEvent.foreBurst, force: true);
-    _chargeSelected(foreTimer + foreChargeTail);
     return true;
   }
 
@@ -642,6 +637,7 @@ class Battle {
     _tagCommentCooldown = math.max(0, _tagCommentCooldown - dt);
 
     _spawnDue();
+    _updateFlags(dt);
     _updateFore(dt);
     if (config.autoCaddie && swingCooldown <= 0) _autoSwing();
     for (final g in gas) {
@@ -1042,17 +1038,43 @@ class Battle {
     }
   }
 
-  /// Charges only the selected tower (spec 3/4). Balls pass through towers, so
-  /// charging comes from Sweet Spot swings and Fore! bursts instead.
-  void _chargeSelected(double seconds) {
-    final t = selectedTower;
-    if (t == null) return;
-    t.overcharge = math.max(t.overcharge, seconds + perkSum(PerkEffect.overchargeDuration));
-    if (t.spec.kind == TowerKind.cartCannon) t.cooldown = 0;
-    fx.add(Fx(FxKind.sweet, [t.pos], ttl: 0.3, radius: towerRadius + 8, colorValue: 0xFFFFEB3B));
+  /// Overcharges every tower (spec 3/4). Balls pass through towers, so the
+  /// boost comes from sinking a ball in a flag's hole.
+  void _boostAllTowers() {
+    final seconds = flagBoostSeconds + perkSum(PerkEffect.overchargeDuration);
+    for (final t in towers) {
+      if (t.removed) continue;
+      t.overcharge = math.max(t.overcharge, seconds);
+      if (t.spec.kind == TowerKind.cartCannon) t.cooldown = 0;
+      fx.add(Fx(FxKind.sweet, [t.pos], ttl: 0.3, radius: towerRadius + 8, colorValue: 0xFFFFEB3B));
+    }
     if (_tagCommentCooldown <= 0) {
       _tagCommentCooldown = 6;
       say(CommentEvent.towerTag);
+    }
+  }
+
+  void _updateFlags(double dt) {
+    for (final f in pins) {
+      f.ttl -= dt;
+    }
+    pins.removeWhere((f) => f.ttl <= 0 || f.sunk);
+    _flagTimer -= dt;
+    if (_flagTimer > 0) return;
+    _flagTimer = flagMinGap + _flagRng.nextDouble() * (flagMaxGap - flagMinGap);
+    if (pins.isNotEmpty || towers.isEmpty) return;
+    final pos = V2(40 + _flagRng.nextDouble() * (worldWidth - 80), 90 + _flagRng.nextDouble() * 270);
+    pins.add(Pin(pos, flagLifetime));
+  }
+
+  /// Sinks a ball at [at] into any flag whose hole it reaches.
+  void _checkFlags(V2 at, double radius) {
+    for (final f in pins) {
+      if (f.sunk || f.pos.distanceTo(at) > flagRadius + radius) continue;
+      f.sunk = true;
+      fx.add(Fx(FxKind.sweet, [f.pos], ttl: 0.4, radius: 36, colorValue: 0xFFFFEB3B));
+      fx.add(Fx(FxKind.text, [f.pos - const V2(0, 20)], ttl: 1, text: 'Boost!', colorValue: 0xFFFFEB3B));
+      _boostAllTowers();
     }
   }
 
@@ -1071,7 +1093,10 @@ class Battle {
         b.lobTime += dt;
         final p = (b.lobTime / b.lobTotal).clamp(0.0, 1.0);
         b.pos = b.lobStart! + (b.lobTarget! - b.lobStart!) * p;
-        if (p >= 1) _landLob(b);
+        if (p >= 1) {
+          _checkFlags(b.lobTarget!, b.club.blastRadius);
+          _landLob(b);
+        }
         continue;
       }
       if (b.club.kind == ClubKind.putter) {
@@ -1097,6 +1122,7 @@ class Battle {
         b.pos = b.pos + b.vel * step;
         _ballWalls(b);
         if (b.done) break;
+        _checkFlags(b.pos, b.radius);
         _ballEnemies(b);
       }
     }

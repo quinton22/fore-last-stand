@@ -128,6 +128,18 @@ class Tower {
   bool get active => !removed && stun <= 0 && !gassed;
 }
 
+/// A flag/hole that pops up on the course; sinking a ball in it boosts all towers.
+class Pin {
+  Pin(this.pos, double ttl)
+      : ttl = ttl,
+        maxTtl = ttl;
+
+  final V2 pos;
+  double ttl;
+  final double maxTtl;
+  bool sunk = false;
+}
+
 class GasCloud {
   GasCloud(this.pos, this.radius, this.time);
 
