@@ -22,15 +22,22 @@ class BestiaryScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Every animal has a trick. Read up here before you meet them: what each does, and what counters it. '
+              'Kills fill the bar on each entry.',
+            ),
+          ),
           for (final e in entries)
             Card(
               child: ListTile(
                 leading: CircleAvatar(backgroundColor: Color(e.colorValue)),
-                title: Text((p.bestiary[e.id] ?? 0) > 0 ? e.name : '???'),
+                title: Text(e.name),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if ((p.bestiary[e.id] ?? 0) > 0) Text('${e.behavior}\nCounter: ${e.counter}'),
+                    Text('${enemyDescription(e)}\n${e.behavior}.\nGood against it: ${e.counter}.'),
                     const SizedBox(height: 4),
                     LinearProgressIndicator(value: ((p.bestiary[e.id] ?? 0) / entryGoal).clamp(0.0, 1.0)),
                   ],

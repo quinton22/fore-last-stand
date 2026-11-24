@@ -54,6 +54,7 @@ class Profile {
     List<String>? caddiesUnlocked,
     this.equippedCaddie,
     Map<String, int>? bestiary,
+    List<String>? tutorialSeen,
     Settings? settings,
   })  : unlockedClubs = unlockedClubs ?? List.of(starterBag),
         bag = bag ?? List.of(starterBag),
@@ -61,6 +62,7 @@ class Profile {
         clubhouse = clubhouse ?? {},
         caddiesUnlocked = caddiesUnlocked ?? [],
         bestiary = bestiary ?? {},
+        tutorialSeen = tutorialSeen ?? [],
         settings = settings ?? Settings();
 
   int coins;
@@ -85,6 +87,9 @@ class Profile {
 
   /// Enemy id -> kills.
   Map<String, int> bestiary;
+
+  /// Tutorial topic ids already shown (`intro`, `enemy:goose`, `build`, `draft`).
+  List<String> tutorialSeen;
   Settings settings;
 
   int clubLevel(String id) => clubLevels[id] ?? 1;
@@ -113,6 +118,7 @@ class Profile {
         'caddiesUnlocked': caddiesUnlocked,
         'equippedCaddie': equippedCaddie,
         'bestiary': bestiary,
+        'tutorialSeen': tutorialSeen,
         'settings': settings.toJson(),
       };
 
@@ -136,6 +142,7 @@ class Profile {
       caddiesUnlocked: strs(j['caddiesUnlocked']),
       equippedCaddie: j['equippedCaddie'] as String?,
       bestiary: ints(j['bestiary']),
+      tutorialSeen: strs(j['tutorialSeen']),
       settings: j['settings'] == null ? null : Settings.fromJson((j['settings'] as Map).cast<String, Object?>()),
     );
     // Drop anything that no longer exists in data.

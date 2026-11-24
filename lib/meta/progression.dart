@@ -40,6 +40,18 @@ const List<ClubhouseUpgrade> clubhouseUpgrades = [
 
 ClubhouseUpgrade clubhouseUpgradeById(String id) => clubhouseUpgrades.firstWhere((u) => u.id == id);
 
+/// Driving Range: every club, free coins, and no waves.
+RunConfig rangeConfigFor(Profile p) => RunConfig(
+      mode: modeById(ModeId.quickRound),
+      seed: DateTime.now().microsecondsSinceEpoch & 0x7fffffff,
+      bag: clubs.map((c) => c.id).toList(),
+      clubLevels: Map.of(p.clubLevels),
+      gridSize: 4 + p.clubhouseLevel('grid'),
+      startingCoins: 9999,
+      aimAssist: p.settings.aimAssist,
+      range: true,
+    );
+
 /// Builds a run config from the profile.
 RunConfig configFor(Profile p, ModeId modeId, {DateTime? now}) {
   final mode = modeById(modeId);

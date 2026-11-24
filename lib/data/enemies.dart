@@ -212,10 +212,31 @@ const List<EnemySpec> bosses = [
   ),
 ];
 
-final Map<String, EnemySpec> _byId = {for (final e in [...enemies, ...bosses]) e.id: e};
+/// Stationary practice targets for the Driving Range (not part of the bestiary).
+const List<EnemySpec> rangeTargets = [
+  EnemySpec(id: 'dummy', name: 'Target Dummy', health: 40, speed: 0, colorValue: 0xFFFFCC80, coins: 0, baseDamage: 0, radius: 14),
+  EnemySpec(id: 'dummy_air', name: 'Flying Target', health: 20, speed: 0, colorValue: 0xFF90CAF9, coins: 0, baseDamage: 0, radius: 11, flier: true, shape: EnemyShape.triangle),
+  EnemySpec(id: 'dummy_tank', name: 'Heavy Target', health: 160, speed: 0, colorValue: 0xFFBCAAA4, coins: 0, baseDamage: 0, radius: 20, shape: EnemyShape.square),
+];
+
+final Map<String, EnemySpec> _byId = {for (final e in [...enemies, ...bosses, ...rangeTargets]) e.id: e};
 
 EnemySpec enemyById(String id) => _byId[id]!;
 
 /// Enemies shown in the bestiary (pups are part of the Coyote Pack entry).
 List<EnemySpec> get bestiaryEntries =>
     [...enemies.where((e) => e.ability != EnemyAbility.pack), ...bosses];
+
+/// Plain-language explanation of what an enemy does and how to handle it.
+String enemyDescription(EnemySpec e) => switch (e.ability) {
+      EnemyAbility.honk => 'Its honk stuns every tower nearby for 2 seconds. Take geese down before they reach your towers.',
+      EnemyAbility.thief => 'If it reaches the clubhouse it steals some of your coins and runs off. Kill it before it escapes.',
+      EnemyAbility.diveTowers => 'It flies over the course and dives at your towers. Only the Driver and Iron (and some towers) can hit fliers.',
+      EnemyAbility.charge => 'It charges in a straight line and ignores slowing effects. Use damage, not slows.',
+      EnemyAbility.bomber => 'It runs at a tower and explodes. Shoot it from a distance before it gets close.',
+      EnemyAbility.gas => 'It releases a gas cloud that disables towers inside it. Kill it from range, then reposition.',
+      EnemyAbility.packLeader => 'It arrives with a pack of pups. While the leader lives, the pups are tougher. Focus the leader.',
+      EnemyAbility.pack => 'A pack member. Kill the leader to weaken it.',
+      EnemyAbility.summonFlock => 'The boss. Huge and slow, and it keeps summoning flocks of geese. Use Fore! bursts and sniper marks.',
+      EnemyAbility.none => 'A slow, heavy tank that soaks up damage. Use area damage like the Wedge.',
+    };

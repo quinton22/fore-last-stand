@@ -44,6 +44,14 @@ class SettingsScreen extends StatelessWidget {
                 value: s.screenShake,
                 onChanged: (v) => store.update((p) => p.settings.screenShake = v),
               ),
+              ListTile(
+                title: const Text('Show welcome tips again'),
+                subtitle: const Text('Brings back the Home intro and restarts the Driving Range tutorial'),
+                onTap: () {
+                  store.update((p) => p.tutorialSeen.clear());
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Welcome tips restored on Home.')));
+                },
+              ),
               const ListTile(title: Text('Gore')),
               RadioGroup<GoreLevel>(
                 groupValue: s.gore,
