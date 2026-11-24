@@ -6,16 +6,17 @@ import 'package:material_ui/material_ui.dart';
 
 void main() {
   testWidgets('home screen lists the modes and gates meta screens', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(400, 1000));
+    await tester.binding.setSurfaceSize(const Size(400, 1500));
     await tester.pumpWidget(ForeApp(store: ProfileStore(Profile())));
     expect(find.text('Quick Round'), findsOneWidget);
     expect(find.text('Sudden Death'), findsOneWidget);
     expect(find.text('after 3 rounds'), findsOneWidget);
-    expect(find.text('New here? Start with a Quick Round.'), findsOneWidget);
+    expect(find.text('Driving Range'), findsOneWidget);
+    expect(find.text('Welcome to Fore! Last Stand'), findsOneWidget);
   });
 
   testWidgets('settings toggles persist into the profile', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(400, 1000));
+    await tester.binding.setSurfaceSize(const Size(400, 1500));
     final store = ProfileStore(Profile());
     await tester.pumpWidget(ForeApp(store: store));
     await tester.tap(find.text('Settings'));
@@ -29,7 +30,7 @@ void main() {
 
   testWidgets('a run screen renders the HUD', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 800));
-    await tester.pumpWidget(ForeApp(store: ProfileStore(Profile())));
+    await tester.pumpWidget(ForeApp(store: ProfileStore(Profile(tutorialSeen: ['welcome']))));
     await tester.tap(find.text('Quick Round'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -39,25 +40,34 @@ void main() {
     expect(find.text('Driver'), findsOneWidget);
   });
 
-  testWidgets('first run pauses on the how-to-play dialog', (tester) async {
+  testWidgets('the Driving Range starts a guided tutorial and advances on goals', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 800));
-    final store = ProfileStore(Profile());
+    final store = ProfileStore(Profile(tutorialSeen: ['welcome']));
     await tester.pumpWidget(ForeApp(store: store));
-    await tester.tap(find.text('Quick Round'));
+    await tester.tap(find.text('Driving Range'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Defend the clubhouse'), findsOneWidget);
-    expect(store.profile.tutorialSeen, contains('intro'));
-    await tester.tap(find.text('Skip'));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Defend the clubhouse'), findsNothing);
+    expect(find.text('Lesson 1 of 11'), findsOneWidget);
+    expect(find.text('Welcome to the Driving Range'), findsOneWidget);
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+    await tester.tap(find.text('Skip lesson'));
+    await tester.pump();
+    expect(find.text('Lesson 3 of 11'), findsOneWidget);
+    expect(find.text('Sweet Spot'), findsOneWidget);
+    await tester.tap(find.text('Skip tutorial'));
+    await tester.pump();
+    expect(find.textContaining('Lesson'), findsNothing);
+    expect(store.profile.tutorialSeen, contains('range'));
+    expect(find.text('Range tools'), findsOneWidget);
   });
 
-  testWidgets('home has a how-to-play button', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(400, 1000));
+  testWidgets('the bestiary describes every animal before you meet it', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1500));
     await tester.pumpWidget(ForeApp(store: ProfileStore(Profile())));
-    await tester.tap(find.text('How to play'));
+    await tester.tap(find.text('Bestiary'));
     await tester.pumpAndSettle();
-    expect(find.text('Defend the clubhouse'), findsOneWidget);
+    expect(find.text('Goose'), findsOneWidget);
+    expect(find.textContaining('honk stuns every tower'), findsOneWidget);
   });
 }

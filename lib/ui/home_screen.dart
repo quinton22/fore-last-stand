@@ -9,12 +9,20 @@ import 'caddies_screen.dart';
 import 'clubhouse_screen.dart';
 import 'run_screen.dart';
 import 'settings_screen.dart';
-import 'tutorial.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.store});
 
   final ProfileStore store;
+
+  void _range(BuildContext context) {
+    store.update((p) {
+      if (!p.tutorialSeen.contains('welcome')) p.tutorialSeen.add('welcome');
+    });
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => RunScreen(store: store, config: rangeConfigFor(store.profile)),
+    ));
+  }
 
   void _play(BuildContext context, ModeId mode) {
     Navigator.of(context).push(MaterialPageRoute(
@@ -48,11 +56,6 @@ class HomeScreen extends StatelessWidget {
                     Chip(label: Text('🪙 ${p.coins}')),
                     Chip(label: Text('🎟 ${p.clubTokens} tokens')),
                     Chip(label: Text('⭐ ${p.xp} XP')),
-                    ActionChip(
-                      avatar: const Icon(Icons.help_outline, size: 18),
-                      label: const Text('How to play'),
-                      onPressed: () => showHowToPlay(context),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -70,10 +73,62 @@ class HomeScreen extends StatelessWidget {
                       onTap: () => _play(context, m.id),
                     ),
                   ),
-                if (p.firstRun)
-                  const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Text('New here? Start with a Quick Round.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+                Card(
+                  color: const Color(0xFF33691E),
+                  child: ListTile(
+                    leading: const Icon(Icons.golf_course, color: Colors.white),
+                    title: const Text('Driving Range', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    subtitle: Text(
+                      p.tutorialSeen.contains('range')
+                          ? 'Practice clubs, towers and Mulligan cards on targets.'
+                          : 'Start here: a hands-on tutorial, then free practice.',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    trailing: const Icon(Icons.play_arrow, color: Colors.white),
+                    onTap: () => _range(context),
+                  ),
+                ),
+                if (!p.tutorialSeen.contains('welcome'))
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text('Welcome to Fore! Last Stand', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              ),
+                              IconButton(
+                                tooltip: 'Dismiss',
+                                onPressed: () => store.update((p) => p.tutorialSeen.add('welcome')),
+                                icon: const Icon(Icons.close),
+                              ),
+                            ],
+                          ),
+                          const Text(
+                            'The course is overrun with zombie animals and you are the last one standing. Two places to learn the ropes:\n\n'
+                            '⛳ Driving Range: a guided tutorial on swinging, clubs, towers and Mulligan cards, then free practice on targets.\n\n'
+                            '📖 Bestiary: what every animal does and which clubs and towers counter it.',
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              FilledButton(onPressed: () => _range(context), child: const Text('Open Driving Range')),
+                              OutlinedButton(
+                                onPressed: () {
+                                  store.update((p) => p.tutorialSeen.add('welcome'));
+                                  _open(context, BestiaryScreen(store: store));
+                                },
+                                child: const Text('Read animal guide'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 const SizedBox(height: 12),
                 Wrap(
