@@ -48,6 +48,11 @@ class HomeScreen extends StatelessWidget {
                     Chip(label: Text('🪙 ${p.coins}')),
                     Chip(label: Text('🎟 ${p.clubTokens} tokens')),
                     Chip(label: Text('⭐ ${p.xp} XP')),
+                    ActionChip(
+                      avatar: const Icon(Icons.help_outline, size: 18),
+                      label: const Text('How to play'),
+                      onPressed: () => showHowToPlay(context),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -70,13 +75,6 @@ class HomeScreen extends StatelessWidget {
                     padding: EdgeInsets.all(8),
                     child: Text('New here? Start with a Quick Round.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
                   ),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () => showHowToPlay(context),
-                    icon: const Icon(Icons.help_outline, color: Colors.white),
-                    label: const Text('How to play', style: TextStyle(color: Colors.white)),
-                  ),
-                ),
                 const SizedBox(height: 12),
                 Wrap(
                   alignment: WrapAlignment.center,
