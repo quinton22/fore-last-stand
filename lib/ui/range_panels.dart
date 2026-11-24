@@ -113,8 +113,16 @@ class LessonCard extends StatelessWidget {
                 spacing: 4,
                 children: [
                   if (lesson.tips.isNotEmpty)
-                    TextButton(onPressed: onToggleTips, child: Text(showTips ? 'Hide details' : 'More details')),
-                  TextButton(onPressed: onSkip, child: const Text('Skip tutorial')),
+                    TextButton(
+                      style: TextButton.styleFrom(foregroundColor: Colors.lightGreenAccent),
+                      onPressed: onToggleTips,
+                      child: Text(showTips ? 'Hide details' : 'More details'),
+                    ),
+                  TextButton(
+                    style: TextButton.styleFrom(foregroundColor: Colors.white70),
+                    onPressed: onSkip,
+                    child: const Text('Skip tutorial'),
+                  ),
                   FilledButton(onPressed: onNext, child: Text(last ? 'Start practicing' : (done ? 'Next' : 'Skip lesson'))),
                 ],
               ),
