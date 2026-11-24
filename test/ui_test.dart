@@ -64,7 +64,7 @@ void main() {
 
   testWidgets('the bestiary describes every animal before you meet it', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 1500));
-    await tester.pumpWidget(ForeApp(store: ProfileStore(Profile())));
+    await tester.pumpWidget(ForeApp(store: ProfileStore(Profile(tutorialSeen: ['welcome']))));
     await tester.tap(find.text('Bestiary'));
     await tester.pumpAndSettle();
     expect(find.text('Goose'), findsOneWidget);
