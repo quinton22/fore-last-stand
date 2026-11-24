@@ -11,11 +11,7 @@ on:
   # A merged PR lands on main as a push, so this builds only on merges that touch the project.
   push:
     branches: [main]
-    paths: ["fore-last-stand/**", ".github/workflows/fore-last-stand-build.yml"]
-
-defaults:
-  run:
-    working-directory: fore-last-stand
+    paths: ["lib/**", "test/**", "pubspec.yaml", "analysis_options.yaml", ".github/workflows/fore-last-stand-build.yml"]
 
 jobs:
   test:
@@ -55,8 +51,8 @@ jobs:
         with:
           name: fore-last-stand-android
           path: |
-            fore-last-stand/build/app/outputs/flutter-apk/*.apk
-            fore-last-stand/build/app/outputs/bundle/release/*.aab
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/bundle/release/*.aab
 
   build-ios:
     needs: test
@@ -74,4 +70,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: fore-last-stand-ios
-          path: fore-last-stand/build/ios/iphoneos/Runner.app
+          path: build/ios/iphoneos/Runner.app
