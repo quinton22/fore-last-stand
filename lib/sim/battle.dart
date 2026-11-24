@@ -53,6 +53,7 @@ class RunConfig {
     this.autoCaddie = false,
     this.enemyCountScale = 1,
     this.tutorial = false,
+    this.range = false,
     this.course = suburbanMuni,
   });
 
@@ -77,6 +78,9 @@ class RunConfig {
 
   /// Scripted first run with hints (spec 10).
   final bool tutorial;
+
+  /// Driving Range: no waves, practice targets, free coins, a full Fore! meter.
+  final bool range;
   final CourseSpec course;
 }
 
@@ -173,6 +177,15 @@ class Battle {
   String? comment;
   double commentTimer = 0;
   String? hint;
+
+  // Driving Range stats (also drive the guided lessons).
+  int swings = 0;
+  int sweetSwings = 0;
+  int foreBursts = 0;
+  int towerCharges = 0;
+  final Set<String> clubsSwung = {};
+  double rangeDamage = 0;
+  double lastHit = 0;
 
   int _nextId = 0;
   bool _firstKillSaid = false;
@@ -272,14 +285,14 @@ class Battle {
   int placeCost(TowerSpec spec) {
     var c = spec.cost.toDouble();
     if (config.modifier == Modifier.cheapSeats) c *= 0.75;
-    if (phase == Phase.playing) c *= livePlacementMultiplier;
+    if (phase == Phase.playing && !config.range) c *= livePlacementMultiplier;
     return c.round();
   }
 
   int upgradePrice(Tower t) {
     var c = upgradeCost(t.spec, t.level).toDouble();
     if (config.modifier == Modifier.cheapSeats) c *= 0.75;
-    if (phase == Phase.playing) c *= livePlacementMultiplier;
+    if (phase == Phase.playing && !config.range) c *= livePlacementMultiplier;
     return c.round();
   }
 
@@ -310,7 +323,7 @@ class Battle {
       placedHole: forHole,
       placedLive: live,
     ));
-    if (live) slowMo = 2;
+    if (live && !config.range) slowMo = 2;
     if (config.tutorial && hint != null && hint!.contains('plot')) hint = null;
     return true;
   }
@@ -324,7 +337,7 @@ class Battle {
     t.level++;
     t.maxHp = t.spec.health * towerLevelMultiplier(t.level);
     t.hp = t.maxHp;
-    if (phase == Phase.playing) slowMo = 2;
+    if (phase == Phase.playing && !config.range) slowMo = 2;
     return true;
   }
 
@@ -354,6 +367,13 @@ class Battle {
   // ---------------------------------------------------------------- holes
 
   void _startHole() {
+    if (config.range) {
+      hole = const HoleSpec(par: 9999, groups: []);
+      holeTime = 0;
+      _queue.clear();
+      phase = Phase.playing;
+      return;
+    }
     hole = _holeFor(holeIndex);
     holeTime = 0;
     pins.clear();
@@ -528,6 +548,11 @@ class Battle {
   Ball _swing(V2 dir, double power, {required bool sweet, bool auto = false}) {
     swingCooldown = swingCooldownMax;
     final c = club;
+    if (!auto) {
+      swings++;
+      clubsSwung.add(c.id);
+      if (sweet) sweetSwings++;
+    }
     var damage = clubDamage(c);
     if (sweet) {
       damage *= sweetSpotDamageMultiplier + perkSum(PerkEffect.sweetSpotDamage);
@@ -567,6 +592,7 @@ class Battle {
   bool triggerFore() {
     if (!foreReady) return false;
     foreMeter = 0;
+    foreBursts++;
     foreTimer = 3;
     _foreVolley = 0;
     shake = 0.3;
@@ -629,6 +655,7 @@ class Battle {
     slowMo = math.max(0, slowMo - dt0);
     final dt = slowed ? dt0 * 0.3 : dt0;
     if (dragging) dragTime += dt0;
+    if (config.range) _rangeUpkeep();
 
     holeTime += dt;
     runTime += dt;
@@ -654,7 +681,32 @@ class Battle {
     balls.removeWhere((b) => b.done);
     towers.removeWhere((t) => t.removed);
 
-    if (_queue.isEmpty && enemies.isEmpty) _holeCleared();
+    if (!config.range && _queue.isEmpty && enemies.isEmpty) _holeCleared();
+  }
+
+  /// Driving Range: free coins, a full Fore! meter, and targets that come back.
+  void _rangeUpkeep() {
+    if (coins < 9999) coins = 9999;
+    if (foreTimer <= 0) foreMeter = 100;
+    baseHp = maxBaseHp;
+    if (!enemies.any((e) => e.alive)) {
+      for (final id in const ['dummy', 'dummy', 'dummy_air']) {
+        spawnTarget(id);
+      }
+    }
+  }
+
+  /// Places a stationary practice target somewhere on the course (Driving Range).
+  Enemy spawnTarget(String id) => spawnEnemy(
+        id,
+        SpawnEdge.top,
+        at: V2(40 + rng.nextDouble() * (worldWidth - 80), 190 + rng.nextDouble() * 150),
+      );
+
+  void resetRangeStats() {
+    swings = sweetSwings = foreBursts = towerCharges = 0;
+    clubsSwung.clear();
+    rangeDamage = lastHit = 0;
   }
 
   void _spawnDue() {
@@ -913,6 +965,10 @@ class Battle {
     if (e.isBoss && cd != null && cd.passive == CaddiePassive.bossDamage) m *= 1 + cd.passiveValue;
     if (e.leader != null && e.leader!.alive) m *= 0.7;
     e.hp -= amount * m;
+    if (config.range) {
+      rangeDamage += amount * m;
+      lastHit = amount * m;
+    }
     if (!quiet) e.hitFlash = 0.1;
     if (e.hp <= 0) _kill(e);
   }
@@ -1041,6 +1097,7 @@ class Battle {
   /// Overcharges every tower (spec 3/4). Balls pass through towers, so the
   /// boost comes from sinking a ball in a flag's hole.
   void _boostAllTowers() {
+    towerCharges++;
     final seconds = flagBoostSeconds + perkSum(PerkEffect.overchargeDuration);
     for (final t in towers) {
       if (t.removed) continue;

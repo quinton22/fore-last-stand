@@ -11,7 +11,9 @@ import '../meta/progression.dart';
 import '../sim/battle.dart';
 import '../sim/combo.dart';
 import '../sim/entities.dart';
+import '../sim/range_lessons.dart';
 import '../sim/vec.dart';
+import 'range_panels.dart';
 import 'results_screen.dart';
 
 class RunScreen extends StatefulWidget {
@@ -30,6 +32,12 @@ class _RunScreenState extends State<RunScreen> {
   Offset? _dragStart;
   bool _paused = false;
   bool _ended = false;
+
+  // Driving Range tutorial progress.
+  bool get _range => widget.config.range;
+  int _lesson = 0;
+  bool _guideOpen = true;
+  bool _tips = false;
 
   @override
   void initState() {
@@ -63,6 +71,10 @@ class _RunScreenState extends State<RunScreen> {
   }
 
   void _quit() {
+    if (_range) {
+      Navigator.of(context).pop();
+      return;
+    }
     battle.phase = Phase.lost;
     _ended = true;
     _finish();
@@ -116,17 +128,36 @@ class _RunScreenState extends State<RunScreen> {
           valueListenable: game.hudTick,
           builder: (context, _, child) => Column(
             children: [
-              _TopBar(battle: battle, onPause: _pause),
+              if (_range)
+                RangeTopBar(battle: battle, onPause: _pause, onTools: _openTools)
+              else
+                _TopBar(battle: battle, onPause: _pause),
               Expanded(
                 child: Stack(
                   children: [
                     child!,
-                    if (battle.comment != null || battle.hint != null)
+                    if (!_range && (battle.comment != null || battle.hint != null))
                       Positioned(
                         top: 8,
                         left: 12,
                         right: 12,
                         child: _Ticker(comment: battle.comment, hint: battle.hint),
+                      ),
+                    if (_range && _guideOpen && _lesson < rangeLessons.length)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        right: 8,
+                        child: LessonCard(
+                          lesson: rangeLessons[_lesson],
+                          index: _lesson,
+                          total: rangeLessons.length,
+                          done: rangeLessons[_lesson].isDone(battle),
+                          showTips: _tips,
+                          onToggleTips: () => setState(() => _tips = !_tips),
+                          onNext: _nextLesson,
+                          onSkip: _closeGuide,
+                        ),
                       ),
                     if (battle.phase == Phase.drafting)
                       Positioned.fill(
@@ -150,7 +181,7 @@ class _RunScreenState extends State<RunScreen> {
                       ),
                     if (_paused)
                       Positioned.fill(
-                        child: _PauseMenu(onResume: _resume, onQuit: _quit),
+                        child: _PauseMenu(onResume: _resume, onQuit: _quit, quitLabel: _range ? 'Leave range' : 'Concede round'),
                       ),
                   ],
                 ),
@@ -183,6 +214,35 @@ class _RunScreenState extends State<RunScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _nextLesson() {
+    if (_lesson + 1 >= rangeLessons.length) return _closeGuide();
+    setState(() {
+      _tips = false;
+      _lesson++;
+      final spawn = rangeLessons[_lesson].spawn;
+      if (spawn != null) battle.spawnTarget(spawn);
+    });
+  }
+
+  void _closeGuide() {
+    setState(() => _guideOpen = false);
+    widget.store.update((p) {
+      if (!p.tutorialSeen.contains('range')) p.tutorialSeen.add('range');
+    });
+  }
+
+  void _openTools() {
+    showRangeTools(
+      context,
+      battle,
+      onReplay: () => setState(() {
+        _lesson = 0;
+        _guideOpen = true;
+        _tips = false;
+      }),
     );
   }
 
@@ -620,8 +680,9 @@ class _TowerSheet extends StatelessWidget {
 }
 
 class _PauseMenu extends StatelessWidget {
-  const _PauseMenu({required this.onResume, required this.onQuit});
+  const _PauseMenu({required this.onResume, required this.onQuit, required this.quitLabel});
 
+  final String quitLabel;
   final VoidCallback onResume;
   final VoidCallback onQuit;
 
@@ -644,7 +705,7 @@ class _PauseMenu extends StatelessWidget {
           const SizedBox(height: 8),
           TextButton(
             onPressed: onQuit,
-            child: const Text('Concede round', style: TextStyle(color: Colors.white70)),
+            child: Text(quitLabel, style: const TextStyle(color: Colors.white70)),
           ),
         ],
       ),
