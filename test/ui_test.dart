@@ -17,7 +17,7 @@ void main() {
 
   testWidgets('settings toggles persist into the profile', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 1500));
-    final store = ProfileStore(Profile());
+    final store = ProfileStore(Profile(tutorialSeen: ['welcome']));
     await tester.pumpWidget(ForeApp(store: store));
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
