@@ -127,6 +127,23 @@ class _RunScreenState extends State<RunScreen> {
   void _onTapUp(TapUpDetails d) {
     if (_paused || !battle.canBuild) return;
     final plot = battle.plotAt(game.toWorld(d.localPosition));
+    if (plot == null) return setState(() => game.selectedPlot = null);
+    final tower = battle.towerAt(plot.$1, plot.$2);
+    setState(() {
+      if (tower == null) {
+        game.selectedPlot = plot; // empty plot: build menu
+      } else {
+        // Tap selects for charging (tap again to deselect); upgrade/sell is a long press.
+        battle.toggleSelect(tower);
+        game.selectedPlot = null;
+      }
+    });
+  }
+
+  void _onLongPress(LongPressStartDetails d) {
+    if (_paused || !battle.canBuild) return;
+    final plot = battle.plotAt(game.toWorld(d.localPosition));
+    if (plot == null || battle.towerAt(plot.$1, plot.$2) == null) return;
     setState(() => game.selectedPlot = plot);
   }
 
@@ -204,6 +221,7 @@ class _RunScreenState extends State<RunScreen> {
                 battle.cancelSwing();
               },
               onTapUp: _onTapUp,
+              onLongPressStart: _onLongPress,
               child: GameWidget(game: game),
             ),
           ),

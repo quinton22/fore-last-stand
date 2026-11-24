@@ -1,0 +1,31 @@
+name: test
+
+on:
+  pull_request:
+    branches: [main]
+    # Skip the default-but-noisy extra triggers; run when a PR is opened, updated or taken out of draft.
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# One run per PR: a new push cancels the in-flight run for the same PR.
+concurrency:
+  group: test-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Don't spend CI minutes on draft PRs.
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

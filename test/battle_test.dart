@@ -4,6 +4,7 @@ import 'package:fore_last_stand/data/modes.dart';
 import 'package:fore_last_stand/data/perks.dart';
 import 'package:fore_last_stand/data/towers.dart';
 import 'package:fore_last_stand/sim/battle.dart';
+import 'package:fore_last_stand/sim/entities.dart';
 import 'package:fore_last_stand/sim/vec.dart';
 
 Battle quick({String? caddie, int coins = 60, List<String> bag = const ['driver', 'iron', 'wedge'], ModeId mode = ModeId.quickRound}) =>
@@ -215,16 +216,89 @@ void main() {
     expect(before - e.hp, closeTo(dry * 1.5, 1e-9));
   });
 
-  test('a ball hitting a tower overcharges it', () {
-    final b = quick(coins: 500);
-    // Plot straight above the tee.
-    final plot = b.plotAt(const V2(180, 560))!;
-    b.placeTower('ball_machine', plot.$1, plot.$2);
-    final t = b.towerAt(plot.$1, plot.$2)!;
-    b.beginSwing();
-    b.releaseSwing(teePosition.x - t.pos.x, teePosition.y - t.pos.y);
-    runUntil(b, () => t.overcharge > 0, seconds: 1);
-    expect(t.overcharge, greaterThan(0));
+  group('ghost balls and tower selection', () {
+    Tower setup(Battle b) {
+      final plot = b.plotAt(const V2(180, 560))!;
+      b.placeTower('ball_machine', plot.$1, plot.$2);
+      return b.towerAt(plot.$1, plot.$2)!;
+    }
+
+    test('balls pass through towers without charging them', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      b.toggleSelect(t);
+      b.beginSwing();
+      final ball = b.releaseSwing(teePosition.x - t.pos.x, teePosition.y - t.pos.y)!;
+      runUntil(b, () => ball.done, seconds: 3);
+      expect(t.overcharge, 0);
+      expect(ball.bounces, ball.club.bounces); // not spent on the tower
+      expect(ball.pos.y, lessThan(t.pos.y)); // flew past it
+    });
+
+    test('tapping selects, tapping again deselects, only one at a time', () {
+      final b = quick(coins: 500);
+      final t1 = setup(b);
+      b.placeTower('sniper', 0, 0);
+      final t2 = b.towerAt(0, 0)!;
+      b.toggleSelect(t1);
+      expect(b.selectedTower, t1);
+      b.toggleSelect(t2);
+      expect(b.selectedTower, t2);
+      b.toggleSelect(t2);
+      expect(b.selectedTower, isNull);
+    });
+
+    test('a Sweet Spot charges only the selected tower', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      b.placeTower('sniper', 0, 0);
+      final other = b.towerAt(0, 0)!;
+      b.toggleSelect(t);
+      b.beginSwing();
+      b.dragTime = 0.5 * 1.1;
+      b.releaseSwing(0, 100);
+      expect(t.overcharge, closeTo(3, 1e-9));
+      expect(other.overcharge, 0);
+    });
+
+    test('with nothing selected a Sweet Spot charges nothing', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      b.beginSwing();
+      b.dragTime = 0.5 * 1.1;
+      b.releaseSwing(0, 100);
+      expect(t.overcharge, 0);
+    });
+
+    test('a normal swing does not charge the selected tower', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      b.toggleSelect(t);
+      b.beginSwing();
+      b.dragTime = 0; // outside the green zone
+      b.releaseSwing(0, 100);
+      expect(t.overcharge, 0);
+    });
+
+    test('Fore! charges the selected tower for the burst plus a tail', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      b.toggleSelect(t);
+      b.foreMeter = 100;
+      b.triggerFore();
+      expect(t.overcharge, closeTo(3 + foreChargeTail, 1e-9));
+    });
+
+    test('selection survives a hole and clears when the tower is sold', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      b.toggleSelect(t);
+      clearHole(b);
+      expect(b.selectedTower, t);
+      b.pickPerk(0); // drafting -> building, so selling is allowed again
+      b.sellTower(t);
+      expect(b.selectedTowerId, isNull);
+    });
   });
 
   test('goose honk stuns nearby towers', () {
