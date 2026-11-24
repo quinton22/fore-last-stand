@@ -162,6 +162,16 @@ class ForeGame extends FlameGame {
           }
         }
       }
+      if (battle.selectedTowerId == t.id) {
+        canvas.drawCircle(
+          _o(t.pos),
+          r + 9,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5
+            ..color = const Color(0xFFFFFFFF),
+        );
+      }
       if (t.overcharge > 0) {
         canvas.drawCircle(_o(t.pos), r + 5 + math.sin(_time * 20) * 2, Paint()..color = const Color(0x66FFEB3B));
       }

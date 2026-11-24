@@ -60,7 +60,7 @@ const List<TowerSpec> towers = [
     health: 40,
     colorValue: 0xFF1E88E5,
     role: 'Rapid weak fire',
-    synergy: 'Hit it to overcharge for 3 s',
+    synergy: 'Overcharged: fires 2.5x faster',
   ),
   TowerSpec(
     id: 'sprinkler',
@@ -74,7 +74,7 @@ const List<TowerSpec> towers = [
     health: 40,
     colorValue: 0xFF4FC3F7,
     role: 'Soaks and slows',
-    synergy: 'Wet enemies take +50% lightning damage',
+    synergy: 'Overcharged: 50% wider spray. Wet enemies take +50% lightning damage',
     hitsFliers: false,
   ),
   TowerSpec(
@@ -89,7 +89,7 @@ const List<TowerSpec> towers = [
     health: 40,
     colorValue: 0xFFFFEB3B,
     role: 'Chain lightning',
-    synergy: 'Pairs with Sprinkler for a chain bonus',
+    synergy: 'Overcharged: +2 chain jumps. Pairs with Sprinkler for a chain bonus',
   ),
   TowerSpec(
     id: 'ripper',
@@ -103,7 +103,7 @@ const List<TowerSpec> towers = [
     health: 70,
     colorValue: 0xFFE53935,
     role: 'Spinning blades guard the base edge',
-    synergy: 'Ball hits spin it faster',
+    synergy: 'Overcharged: spins twice as fast and doubles damage',
     hitsFliers: false,
   ),
   TowerSpec(
@@ -118,7 +118,7 @@ const List<TowerSpec> towers = [
     health: 50,
     colorValue: 0xFF8E24AA,
     role: 'Slow, heavy splash',
-    synergy: 'Sweet Spot balls reload it instantly',
+    synergy: 'Overcharging reloads it instantly',
     hitsFliers: false,
   ),
   TowerSpec(
@@ -133,7 +133,7 @@ const List<TowerSpec> towers = [
     health: 35,
     colorValue: 0xFF43A047,
     role: 'Single target, long range',
-    synergy: 'Marks bosses for extra damage',
+    synergy: 'Overcharged: fires twice as fast. Marks bosses for extra damage',
   ),
 ];
 
