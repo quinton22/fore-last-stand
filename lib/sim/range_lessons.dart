@@ -27,7 +27,7 @@ final List<RangeLesson> rangeLessons = [
     title: 'Welcome to the Driving Range',
     body: 'A virus has turned the course\'s animals into zombies and you are the last person standing at the clubhouse. '
         'This range is where you learn to fight back. Nothing here can hurt you, and you can leave any time.',
-    tips: const [
+    tips: [
       'Your clubhouse (the 🚩 flags) is at the bottom. Enemies walk toward it; each one that arrives damages it.',
       'Clear every enemy on a hole to move on. Beat the last hole to win the round.',
       'Orange dummies are practice targets. They never move and they come back when destroyed.',
