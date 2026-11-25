@@ -122,13 +122,43 @@ class _MainTabNavState extends State<MainTabNav> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          spacing: 16.0,
+          children: [
+            Text(
+              '🪙 ${widget.store.profile.coins}',
+              style: const TextStyle(fontSize: 16),
+            ),
+            Text(
+              '🎟 ${widget.store.profile.clubTokens} tokens',
+              style: const TextStyle(fontSize: 16),
+            ),
+            Text(
+              '⭐ ${widget.store.profile.xp} XP',
+              style: const TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(store: widget.store),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          // lockedText: p.bagUnlocked ? null : 'after 3 rounds',
           BagScreen(store: widget.store),
 
-          // lockedText: p.clubhouseUnlocked ? null : 'after 2 rounds',
           ClubhouseScreen(store: widget.store),
 
           HomeScreen(store: widget.store),
@@ -136,8 +166,6 @@ class _MainTabNavState extends State<MainTabNav> {
           CaddiesScreen(store: widget.store),
 
           BestiaryScreen(store: widget.store),
-
-          // SettingsScreen(store: widget.store),
         ],
       ),
       bottomNavigationBar: ListenableBuilder(

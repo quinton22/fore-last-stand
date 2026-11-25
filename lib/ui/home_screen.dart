@@ -1,3 +1,4 @@
+import 'package:fore_last_stand/ui/common/border_emphasis.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../data/modes.dart';
@@ -42,6 +43,21 @@ class HomeScreen extends StatelessWidget {
       builder: (context, _) {
         final p = store.profile;
         final today = dailySeed(DateTime.now());
+        final drivingRangeListTile = ListTile(
+          leading: const Icon(Icons.golf_course, color: Colors.white),
+          title: const Text(
+            'Driving Range',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          subtitle: Text(
+            p.tutorialSeen.contains('range')
+                ? 'Practice clubs, towers and Mulligan cards on targets.'
+                : 'Start here: a hands-on tutorial, then free practice.',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          trailing: const Icon(Icons.play_arrow, color: Colors.white),
+          onTap: () => _range(context),
+        );
         return Scaffold(
           backgroundColor: const Color(0xFF1B5E20),
           body: SafeArea(
@@ -68,16 +84,18 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  children: [
-                    Chip(label: Text('🪙 ${p.coins}')),
-                    Chip(label: Text('🎟 ${p.clubTokens} tokens')),
-                    Chip(label: Text('⭐ ${p.xp} XP')),
-                  ],
+                Card(
+                  color: const Color(0xFF33691E),
+                  child: p.tutorialSeen.contains('range')
+                      ? drivingRangeListTile
+                      : BorderEmphasis(
+                          borderRadius: 8.0,
+                          color1: Colors.lightGreenAccent,
+                          color2: Colors.green,
+                          duration: Durations.long3,
+                          child: drivingRangeListTile,
+                        ),
                 ),
-                const SizedBox(height: 16),
                 for (final m in modes)
                   Card(
                     child: ListTile(
@@ -102,27 +120,6 @@ class HomeScreen extends StatelessWidget {
                       onTap: () => _play(context, m.id),
                     ),
                   ),
-                Card(
-                  color: const Color(0xFF33691E),
-                  child: ListTile(
-                    leading: const Icon(Icons.golf_course, color: Colors.white),
-                    title: const Text(
-                      'Driving Range',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    subtitle: Text(
-                      p.tutorialSeen.contains('range')
-                          ? 'Practice clubs, towers and Mulligan cards on targets.'
-                          : 'Start here: a hands-on tutorial, then free practice.',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                    trailing: const Icon(Icons.play_arrow, color: Colors.white),
-                    onTap: () => _range(context),
-                  ),
-                ),
 
                 for (final u in nearestUnlocks(p))
                   Padding(
