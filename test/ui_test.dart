@@ -8,9 +8,10 @@ void main() {
   testWidgets('home screen lists the modes and gates meta screens', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 1500));
     await tester.pumpWidget(ForeApp(store: ProfileStore(Profile())));
+    await tester.pump();
     expect(find.text('Quick Round'), findsOneWidget);
     expect(find.text('Sudden Death'), findsOneWidget);
-    expect(find.text('after 3 rounds'), findsOneWidget);
+    expect(find.text('Unlock Bag: 0/3 rounds'), findsOneWidget);
     expect(find.text('Driving Range'), findsOneWidget);
     expect(find.text('Welcome to Fore! Last Stand'), findsOneWidget);
   });
@@ -19,7 +20,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(400, 1500));
     final store = ProfileStore(Profile(tutorialSeen: ['welcome']));
     await tester.pumpWidget(ForeApp(store: store));
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byIcon(Icons.settings));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Left-handed layout'));
     await tester.tap(find.text('Squeaky Clean (confetti)'));
@@ -66,7 +67,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(400, 1500));
     await tester.pumpWidget(ForeApp(store: ProfileStore(Profile(tutorialSeen: ['welcome']))));
     await tester.tap(find.text('Bestiary'));
-    await tester.pumpAndSettle();
+    // The home tab's pulsing BorderEmphasis never settles, so pump fixed frames.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Goose'), findsOneWidget);
     expect(find.textContaining('honk stuns every tower'), findsOneWidget);
   });
