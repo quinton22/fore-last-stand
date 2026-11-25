@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 import '../data/modes.dart';
 import '../meta/profile_store.dart';
 import '../meta/progression.dart';
-import 'bestiary_screen.dart';
 import 'run_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -33,8 +32,21 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _open(BuildContext context, Widget screen) =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  Widget _buildUnlockItem(NearUnlock u) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${u.name}: ${u.have}/${u.need} ${u.currency}',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          LinearProgressIndicator(value: u.progress, minHeight: 4),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +55,13 @@ class HomeScreen extends StatelessWidget {
       builder: (context, _) {
         final p = store.profile;
         final today = dailySeed(DateTime.now());
+        final nearestUnlocksList = [
+          if (!p.clubhouseUnlocked)
+            NearUnlock('Unlock Clubhouse', p.runsPlayed, 2, 'rounds'),
+          if (!p.bagUnlocked)
+            NearUnlock('Unlock Bag', p.runsPlayed, 3, 'rounds'),
+          ...nearestUnlocks(p),
+        ];
         final drivingRangeListTile = ListTile(
           leading: const Icon(Icons.golf_course, color: Colors.white),
           title: const Text(
@@ -84,6 +103,13 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+                Text(
+                  'Game modes',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 Card(
                   color: const Color(0xFF33691E),
                   child: p.tutorialSeen.contains('range')
@@ -120,30 +146,16 @@ class HomeScreen extends StatelessWidget {
                       onTap: () => _play(context, m.id),
                     ),
                   ),
-
-                for (final u in nearestUnlocks(p))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 4,
-                      horizontal: 8,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${u.name}: ${u.have}/${u.need} ${u.currency}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                        LinearProgressIndicator(
-                          value: u.progress,
-                          minHeight: 4,
-                        ),
-                      ],
+                const SizedBox(height: 12),
+                if (nearestUnlocksList.isNotEmpty)
+                  Text(
+                    'Unlocks',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
+                for (final u in nearestUnlocksList) _buildUnlockItem(u),
               ],
             ),
           ),
