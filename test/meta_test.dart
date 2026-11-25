@@ -9,7 +9,7 @@ import 'package:fore_last_stand/meta/progression.dart';
 import 'package:fore_last_stand/sim/battle.dart';
 import 'package:fore_last_stand/sim/combo.dart';
 
-RunResult result({bool won = true, ModeId mode = ModeId.quickRound, int holes = 5}) => RunResult(
+RunResult result({bool won = true, ModeId mode = ModeId.suddenDeath, int holes = 5}) => RunResult(
       won: won,
       mode: mode,
       holesCleared: holes,
@@ -58,9 +58,9 @@ void main() {
   test('loss streak drives hidden adaptive difficulty', () {
     final p = Profile();
     applyRun(p, result(won: false));
-    expect(configFor(p, ModeId.quickRound).enemyCountScale, 1);
+    expect(configFor(p, ModeId.suddenDeath).enemyCountScale, 1);
     applyRun(p, result(won: false));
-    expect(configFor(p, ModeId.quickRound).enemyCountScale, 0.9);
+    expect(configFor(p, ModeId.suddenDeath).enemyCountScale, 0.9);
     applyRun(p, result());
     expect(p.lossStreak, 0);
   });
@@ -82,7 +82,7 @@ void main() {
     expect(buyClubhouseUpgrade(p, 'grid'), isFalse, reason: 'max 6x6');
     buyClubhouseUpgrade(p, 'coins');
     buyClubhouseUpgrade(p, 'walls');
-    final c = configFor(p, ModeId.fullRound);
+    final c = configFor(p, ModeId.suddenDeath);
     expect(c.gridSize, 6);
     expect(c.startingCoins, 80);
     expect(c.bonusClubhouseHp, 20);

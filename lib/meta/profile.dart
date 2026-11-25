@@ -10,6 +10,7 @@ class Settings {
     this.leftHanded = false,
     this.gore = GoreLevel.classic,
     this.screenShake = true,
+    this.testAds = false,
   });
 
   double aimAssist;
@@ -18,12 +19,16 @@ class Settings {
   GoreLevel gore;
   bool screenShake;
 
+  /// Development stand-in for rewarded ads (no ad SDK is wired up yet).
+  bool testAds;
+
   Map<String, Object?> toJson() => {
         'aimAssist': aimAssist,
         'autoCaddie': autoCaddie,
         'leftHanded': leftHanded,
         'gore': gore.name,
         'screenShake': screenShake,
+        'testAds': testAds,
       };
 
   factory Settings.fromJson(Map<String, Object?> j) => Settings(
@@ -32,6 +37,7 @@ class Settings {
         leftHanded: j['leftHanded'] as bool? ?? false,
         gore: GoreLevel.values.firstWhere((g) => g.name == j['gore'], orElse: () => GoreLevel.classic),
         screenShake: j['screenShake'] as bool? ?? true,
+        testAds: j['testAds'] as bool? ?? false,
       );
 }
 

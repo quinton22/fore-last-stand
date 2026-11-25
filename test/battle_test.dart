@@ -7,7 +7,7 @@ import 'package:fore_last_stand/sim/battle.dart';
 import 'package:fore_last_stand/sim/entities.dart';
 import 'package:fore_last_stand/sim/vec.dart';
 
-Battle quick({String? caddie, int coins = 60, List<String> bag = const ['driver', 'iron', 'wedge'], ModeId mode = ModeId.quickRound}) =>
+Battle quick({String? caddie, int coins = 60, List<String> bag = const ['driver', 'iron', 'wedge'], ModeId mode = ModeId.dailyTournament}) =>
     Battle(RunConfig(mode: modeById(mode), seed: 42, caddieId: caddie, startingCoins: coins, bag: bag, aimAssist: 0));
 
 /// Runs the sim until [cond] or [seconds] elapse.
@@ -136,15 +136,14 @@ void main() {
     expect(b.holeIndex, 1);
   });
 
-  test('a Quick Round is won after 5 holes, the last with a mini-boss', () {
+  test('a Daily Tournament is won after 5 holes', () {
     final b = quick();
     for (var i = 0; i < 4; i++) {
       clearHole(b);
       b.pickPerk(0);
       b.teeOff();
     }
-    expect(b.hole.hasBoss, isTrue);
-    expect(b.hole.bossScale, lessThan(1));
+    expect(b.holeIndex, 4);
     clearHole(b);
     expect(b.phase, Phase.won);
     expect(b.result().won, isTrue);
@@ -401,13 +400,13 @@ void main() {
   });
 
   test('adaptive difficulty spawns fewer enemies', () {
-    final normal = Battle(RunConfig(mode: modeById(ModeId.fullRound), seed: 1));
-    final eased = Battle(RunConfig(mode: modeById(ModeId.fullRound), seed: 1, enemyCountScale: 0.5));
+    final normal = Battle(RunConfig(mode: modeById(ModeId.dailyTournament), seed: 1));
+    final eased = Battle(RunConfig(mode: modeById(ModeId.dailyTournament), seed: 1, enemyCountScale: 0.5));
     expect(eased.remainingSpawns, lessThan(normal.remainingSpawns));
   });
 
-  test('a simulated full round with an auto-caddie and towers plays without errors', () {
-    final b = Battle(RunConfig(mode: modeById(ModeId.fullRound), seed: 7, autoCaddie: true, startingCoins: 400, caddieId: 'dottie'));
+  test('a simulated daily round with an auto-caddie and towers plays without errors', () {
+    final b = Battle(RunConfig(mode: modeById(ModeId.dailyTournament), seed: 7, autoCaddie: true, startingCoins: 400, caddieId: 'dottie'));
     b.placeTower('ball_machine', 1, 0);
     b.placeTower('tee_tesla', 2, 0);
     b.placeTower('sprinkler', 2, 1);
@@ -449,7 +448,7 @@ void main() {
     });
 
     test('aim assist ignores fliers the club cannot hit', () {
-      final b = Battle(RunConfig(mode: modeById(ModeId.quickRound), seed: 42, aimAssist: 1));
+      final b = Battle(RunConfig(mode: modeById(ModeId.dailyTournament), seed: 42, aimAssist: 1));
       b.enemies.clear();
       b.selectClub(2); // wedge
       // A crow just right of straight up; nothing else on the board.
@@ -487,7 +486,7 @@ void main() {
     });
 
     test('auto-caddie wedge lobs land on the target', () {
-      final b = Battle(RunConfig(mode: modeById(ModeId.quickRound), seed: 3, autoCaddie: true, aimAssist: 0));
+      final b = Battle(RunConfig(mode: modeById(ModeId.dailyTournament), seed: 3, autoCaddie: true, aimAssist: 0));
       b.enemies.clear();
       b.selectClub(2);
       final target = b.spawnEnemy('gator', SpawnEdge.top, at: teePosition - const V2(0, 200));

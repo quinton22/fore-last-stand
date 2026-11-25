@@ -3,6 +3,11 @@ import 'package:material_ui/material_ui.dart';
 import '../data/modes.dart';
 import '../meta/profile_store.dart';
 import '../meta/progression.dart';
+import '../story/progression.dart' as story_rules;
+import '../story/story_store.dart';
+import '../story/ui/course_select_screen.dart';
+import '../story/ui/story_nav.dart';
+import '../story/ui/story_results_screen.dart';
 import 'bag_screen.dart';
 import 'bestiary_screen.dart';
 import 'caddies_screen.dart';
@@ -10,10 +15,32 @@ import 'clubhouse_screen.dart';
 import 'run_screen.dart';
 import 'settings_screen.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.store});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key, required this.store, required this.story});
 
   final ProfileStore store;
+  final StoryStore story;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  ProfileStore get store => widget.store;
+  StoryDeps get deps => StoryDeps(profile: widget.store, story: widget.story);
+
+  @override
+  void initState() {
+    super.initState();
+    // If the app closed on a Story Results screen, reopen on it.
+    final pending = widget.story.save.pendingCourse;
+    if (pending != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => StoryResultsScreen(deps: deps, courseId: pending)));
+      });
+    }
+  }
 
   void _range(BuildContext context) {
     store.update((p) {
@@ -35,7 +62,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: store,
+      listenable: Listenable.merge([store, widget.story]),
       builder: (context, _) {
         final p = store.profile;
         final today = dailySeed(DateTime.now());
@@ -59,6 +86,11 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
+                _storyCard(context),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(4, 12, 4, 4),
+                  child: Text('Arcade', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                ),
                 for (final m in modes)
                   Card(
                     child: ListTile(
@@ -170,6 +202,28 @@ class HomeScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+extension on _HomeScreenState {
+  Widget _storyCard(BuildContext context) {
+    final story = widget.story;
+    final content = story.content;
+    final courseId = story.save.unlockedCourses.lastWhere((id) => content.courseContent.containsKey(id), orElse: () => content.courses.first.id);
+    final course = content.course(courseId);
+    final cs = story.course(courseId);
+    return Card(
+      color: Colors.amber.shade100,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: const Icon(Icons.flag, size: 40, color: Color(0xFFC62828)),
+        title: const Text('Story', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
+        subtitle: Text('${course.name}: ${story_rules.resumeLabel(cs, course)} · Rank ${cs.rank}\nHoles of 3 rounds each. Earn clubs, towers carry between rounds.'),
+        isThreeLine: true,
+        trailing: const Icon(Icons.play_arrow),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CourseSelectScreen(deps: deps))),
+      ),
     );
   }
 }

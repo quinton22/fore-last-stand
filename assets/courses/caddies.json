@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "caddies": [
+    {"id": "big_earl", "name": "Big Earl", "color": "0xFFFF7043",
+     "passive": {"type": "foreDamage", "value": 0.3}, "passiveText": "Fore! burst damage +30%",
+     "active": {"type": "foreMeter", "value": 50}, "activeName": "Pep Talk", "activeText": "Adds 50 to the Fore! meter",
+     "unlock": {"type": "start"}, "unlockText": "From the start"},
+    {"id": "dottie", "name": "Dottie", "color": "0xFF7E57C2",
+     "passive": {"type": "bossDamage", "value": 0.15}, "passiveText": "Boss damage +15%",
+     "active": {"type": "mark", "value": 0.5, "seconds": 6}, "activeName": "Mark", "activeText": "Marks the toughest enemy: +50% damage taken for 6 s",
+     "unlock": {"type": "beatHole", "hole": 3}, "unlockText": "Beat hole 3"}
+  ]
+}

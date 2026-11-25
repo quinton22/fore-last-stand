@@ -42,7 +42,7 @@ ClubhouseUpgrade clubhouseUpgradeById(String id) => clubhouseUpgrades.firstWhere
 
 /// Driving Range: every club, free coins, and no waves.
 RunConfig rangeConfigFor(Profile p) => RunConfig(
-      mode: modeById(ModeId.quickRound),
+      mode: modeById(ModeId.dailyTournament),
       seed: DateTime.now().microsecondsSinceEpoch & 0x7fffffff,
       bag: clubs.map((c) => c.id).toList(),
       clubLevels: Map.of(p.clubLevels),

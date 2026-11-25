@@ -1,41 +1,26 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fore_last_stand/data/courses.dart';
 import 'package:fore_last_stand/data/enemies.dart';
 import 'package:fore_last_stand/sim/waves.dart';
 
 void main() {
-  test('Suburban Muni has 9 holes, breathers on 3 and 6, boss on 9', () {
-    final holes = suburbanMuni.holes;
-    expect(holes, hasLength(9));
-    expect(holes[2].breather, isTrue);
-    expect(holes[5].breather, isTrue);
-    expect(holes[8].hasBoss, isTrue);
-    expect(holes.take(8).any((h) => h.hasBoss), isFalse);
-  });
-
-  test('hole 1 introduces one enemy type and hole 5 mixes four', () {
-    Set<String> types(HoleSpec h) => h.groups.map((g) => g.enemyId).toSet();
-    expect(types(suburbanMuni.holes[0]), hasLength(1));
-    expect(types(suburbanMuni.holes[4]), hasLength(4));
-  });
-
-  test('every spawn group references a real enemy', () {
-    for (final h in [...suburbanMuni.holes, miniBossHole]) {
-      for (final g in h.groups) {
+  test('every generated spawn group references a real enemy', () {
+    for (var i = 0; i < 20; i++) {
+      for (final g in generateHole(i, math.Random(i)).groups) {
         expect(() => enemyById(g.enemyId), returnsNormally, reason: g.enemyId);
       }
     }
   });
 
   test('schedules are sorted and scale with count but never scale bosses', () {
-    final s = scheduleHole(suburbanMuni.holes[8], math.Random(1), countScale: 2);
+    final hole = generateHole(8, math.Random(1));
+    final s = scheduleHole(hole, math.Random(1), countScale: 2);
     for (var i = 1; i < s.length; i++) {
       expect(s[i].time, greaterThanOrEqualTo(s[i - 1].time));
     }
     expect(s.where((x) => x.enemyId == 'goose_king'), hasLength(1));
-    final base = scheduleHole(suburbanMuni.holes[8], math.Random(1));
+    final base = scheduleHole(hole, math.Random(1));
     expect(s.length, greaterThan(base.length));
   });
 

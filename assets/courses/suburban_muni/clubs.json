@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "starter": "iron_old",
+  "clubs": [
+    {"id": "iron_old", "rank": 1, "name": "Rusty 7-Iron", "family": "iron", "tier": "old", "price": 0},
+    {"id": "wood_old", "rank": 2, "name": "Granddad's 3-Wood", "family": "wood", "tier": "old", "price": 25},
+    {"id": "driver_used", "rank": 3, "name": "Used Driver", "family": "driver", "tier": "used"},
+    {"id": "wedge_old", "rank": 4, "name": "Bent Wedge", "family": "wedge", "tier": "old"},
+    {"id": "iron_used", "rank": 5, "name": "Used Iron", "family": "iron", "tier": "used"},
+    {"id": "putter_old", "rank": 6, "name": "Thrift-Store Putter", "family": "putter", "tier": "old"},
+    {"id": "driver_new", "rank": 7, "name": "New Driver", "family": "driver", "tier": "new"},
+    {"id": "wood_used", "rank": 8, "name": "Used Fairway Wood", "family": "wood", "tier": "used"},
+    {"id": "wedge_new", "rank": 9, "name": "New Wedge", "family": "wedge", "tier": "new"},
+    {"id": "iron_new", "rank": 10, "name": "New Iron", "family": "iron", "tier": "new"},
+    {"id": "foghorn", "rank": 11, "name": "The Foghorn", "family": "driver", "tier": "special", "effect": {"type": "knockback", "distance": 40}, "effectText": "Knocks enemies back 40, not bosses"},
+    {"id": "putter_new", "rank": 12, "name": "New Putter", "family": "putter", "tier": "new"},
+    {"id": "wood_new", "rank": 13, "name": "New Fairway Wood", "family": "wood", "tier": "new"},
+    {"id": "hot_poker", "rank": 14, "name": "Hot Poker", "family": "iron", "tier": "special", "effect": {"type": "burn", "dps": 8, "seconds": 3}, "effectText": "Burn: 8 damage/s for 3 s"},
+    {"id": "deep_freeze", "rank": 15, "name": "Deep Freeze", "family": "wedge", "tier": "special", "effect": {"type": "freeze", "slow": 0.5, "seconds": 2}, "effectText": "Blast slows 50% for 2 s"},
+    {"id": "magnet_mallet", "rank": 16, "name": "Magnet Mallet", "family": "putter", "tier": "special", "effect": {"type": "magnet", "radius": 70}, "effectText": "Ball curves toward enemies within 70"},
+    {"id": "twin_timber", "rank": 17, "name": "Twin Timber", "family": "wood", "tier": "special", "effect": {"type": "twin", "balls": 2, "spreadDegrees": 10, "damage": 0.7}, "effectText": "Fires 2 balls, 10 degrees apart, 70% damage each"},
+    {"id": "thunder_stick", "rank": 18, "name": "Thunder Stick", "family": "driver", "tier": "special", "effect": {"type": "chain", "targets": 3, "damage": 0.5, "range": 110}, "effectText": "Sweet Spot chains to 3 enemies at 50% damage"}
+  ]
+}

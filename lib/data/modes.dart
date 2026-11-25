@@ -1,5 +1,6 @@
 /// Game modes are wrappers around the same engine (spec 6).
-enum ModeId { quickRound, fullRound, suddenDeath, dailyTournament }
+/// Arcade modes. Story Mode (section 6a) has its own engine in `lib/story/`.
+enum ModeId { suddenDeath, dailyTournament }
 
 /// Run-wide twists used by the Daily Tournament.
 enum Modifier { none, windy, bigBalls, stampede, cheapSeats, glassClubhouse }
@@ -29,8 +30,6 @@ class ModeSpec {
 }
 
 const List<ModeSpec> modes = [
-  ModeSpec(id: ModeId.quickRound, name: 'Quick Round', length: '3-5 min', structure: '5 holes, mini-boss on hole 5', flags: 3, holes: 5),
-  ModeSpec(id: ModeId.fullRound, name: 'Full Round', length: '10-15 min', structure: '9 holes, boss on hole 9', flags: 3, holes: 9),
   ModeSpec(id: ModeId.suddenDeath, name: 'Sudden Death', length: 'Open-ended', structure: 'Endless waves, one flag life', flags: 1),
   ModeSpec(id: ModeId.dailyTournament, name: 'Daily Tournament', length: '5 min', structure: 'Fixed daily seed and modifier, 5 holes', flags: 3, holes: 5),
 ];

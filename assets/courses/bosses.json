@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "bosses": [
+    {"id": "goose_king", "name": "Goose King", "hp": 700, "holes": [1, 5, 10, 14], "color": "0xFFFFD54F",
+     "ability": {"type": "summon", "enemy": "goose", "count": 4, "every": 8}, "text": "Summons 4 geese every 8 s"},
+    {"id": "alpha_gator", "name": "Alpha Gator", "hp": 1000, "holes": [3, 7, 12, 16], "color": "0xFF1B5E20",
+     "ability": {"type": "submerge", "every": 10, "seconds": 3}, "text": "Submerges 3 s every 10 s, untargetable"},
+    {"id": "mutant_groundhog", "name": "Mutant Groundhog", "hp": 900, "holes": [2, 6, 11, 15], "color": "0xFF8D6E63",
+     "ability": {"type": "disablePlots", "count": 1, "seconds": 6, "every": 9}, "text": "Disables a random plot 6 s, every 9 s"},
+    {"id": "grizzly_greenskeeper", "name": "Grizzly Greenskeeper", "hp": 1300, "holes": [4, 8, 9, 13, 17, 18], "color": "0xFF4E342E",
+     "ability": {"type": "disablePlots", "count": 2, "seconds": 6, "every": 10}, "text": "Disables up to 2 plots with traps, every 10 s"}
+  ]
+}

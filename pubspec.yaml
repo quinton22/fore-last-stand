@@ -13,6 +13,7 @@ dependencies:
   flame: ^1.18.0
   material_ui: ^1.11.1
   shared_preferences: ^2.2.0
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -21,3 +22,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/courses/
+    - assets/courses/suburban_muni/

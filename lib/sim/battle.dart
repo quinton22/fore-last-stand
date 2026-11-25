@@ -391,26 +391,10 @@ class Battle {
     if (config.tutorial && holeIndex == 3) hint = 'Sink a ball in a flag to overcharge all your towers.';
   }
 
-  HoleSpec _holeFor(int index) {
-    switch (config.mode.id) {
-      case ModeId.quickRound:
-        const order = [0, 1, 3, 4];
-        return index < order.length ? config.course.holes[order[index]] : miniBossHole;
-      case ModeId.fullRound:
-        return config.course.holes[index];
-      case ModeId.suddenDeath:
-      case ModeId.dailyTournament:
-        // Own RNG per hole so a seed always yields the same holes (Daily Tournament).
-        return generateHole(index, math.Random(config.seed * 1000 + index));
-    }
-  }
+  // Own RNG per hole so a seed always yields the same holes (Daily Tournament).
+  HoleSpec _holeFor(int index) => generateHole(index, math.Random(config.seed * 1000 + index));
 
-  double get _enemyHpScale {
-    if (config.mode.endless || config.mode.id == ModeId.dailyTournament) {
-      return 1 + 0.07 * math.max(0, holeIndex - 3);
-    }
-    return 1;
-  }
+  double get _enemyHpScale => 1 + 0.07 * math.max(0, holeIndex - 3);
 
   void _holeCleared() {
     holesCleared++;
