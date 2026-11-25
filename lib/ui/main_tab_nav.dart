@@ -123,22 +123,27 @@ class _MainTabNavState extends State<MainTabNav> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          spacing: 16.0,
-          children: [
-            Text(
-              '🪙 ${widget.store.profile.coins}',
-              style: const TextStyle(fontSize: 16),
-            ),
-            Text(
-              '🎟 ${widget.store.profile.clubTokens} tokens',
-              style: const TextStyle(fontSize: 16),
-            ),
-            Text(
-              '⭐ ${widget.store.profile.xp} XP',
-              style: const TextStyle(fontSize: 16),
-            ),
-          ],
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 16.0,
+            children: [
+              Text(
+                '🪙 ${widget.store.profile.coins}',
+                style: const TextStyle(fontSize: 16),
+              ),
+              Text(
+                '🎟 ${widget.store.profile.clubTokens} tokens',
+                style: const TextStyle(fontSize: 16),
+              ),
+              Text(
+                '⭐ ${widget.store.profile.xp} XP',
+                style: const TextStyle(fontSize: 16),
+              ),
+            ],
+          ),
         ),
 
         actions: [
