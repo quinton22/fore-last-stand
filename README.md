@@ -11,7 +11,7 @@ Playable MVP of the [feature spec](https://claude.ai/code/artifact/f2b2c67e-0ef5
 **In the build**
 
 - **Swing:** drag back anywhere, release on the timing ring's green zone for a Sweet Spot (+50% damage, +1 pierce, screen shake). Dotted preview of the first wall bounce, ~0.8 s cooldown, aim-assist slider.
-- **Depth:** balls ricochet off walls and enemies but pass through your own towers; tap a tower to select it and Sweet Spot hits (3 s) and Fore! bursts overcharge it (long-press a tower to upgrade or sell), combo ladder Bogey → Albatross (coin multiplier, Fore! meter), 3-second Fore! barrage.
+- **Depth:** balls ricochet off walls and enemies but pass through your own towers; flags occasionally pop up on the course and sinking a ball in one overcharges every tower (tap a tower to upgrade or sell), combo ladder Bogey → Albatross (coin multiplier, Fore! meter), 3-second Fore! barrage.
 - **Clubs:** Driver (pierce 3), Iron (2 bounces), Wedge (lob + blast), Putter (ground roll, unlocked in the Bag). 3-club bag, tap to swap.
 - **Towers (6):** Range Ball Machine, Sprinkler, Tee-Tesla, Lawnmower Ripper, Cart Cannon, Caddie Sniper on a 4x4 plot grid (5x5/6x6 via Clubhouse). Build between holes, or live at double cost with 2 s slow-mo. Sell for 70%, free re-placement in the first 10 s. Sprinkler + Tee-Tesla pair bonus; 3 tower levels.
 - **Enemies (8) + boss:** Goose (honk stuns towers), Gator (surfaces from water), Raccoon (steals coins), Crow (flier, dives towers), Boar (charges, ignores slows), Squirrel Bomber, Skunk (gas disables towers), Coyote Pack (leader buffs pups), Goose King boss (summons flocks).

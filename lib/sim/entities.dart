@@ -82,6 +82,9 @@ class Ball {
   bool done = false;
   final Set<int> hitIds = {};
 
+  /// Towers this ball has already passed through (each counts once per ball).
+  final Set<int> towerIds = {};
+
   // Wedge lob.
   V2? lobStart;
   V2? lobTarget;
@@ -114,6 +117,9 @@ class Tower {
   double cooldown = 0;
   double stun = 0;
   double overcharge = 0;
+
+  /// Balls that have passed through this tower toward its next boost.
+  int boostCharge = 0;
   bool gassed = false;
   int invested;
 
@@ -126,6 +132,18 @@ class Tower {
 
   bool get removed => hp <= 0;
   bool get active => !removed && stun <= 0 && !gassed;
+}
+
+/// A flag/hole that pops up on the course; sinking a ball in it boosts all towers.
+class Pin {
+  Pin(this.pos, double ttl)
+      : ttl = ttl,
+        maxTtl = ttl;
+
+  final V2 pos;
+  double ttl;
+  final double maxTtl;
+  bool sunk = false;
 }
 
 class GasCloud {

@@ -72,6 +72,7 @@ class ForeGame extends FlameGame {
     _drawGas(canvas);
     _drawTowers(canvas);
     _drawEnemies(canvas);
+    _drawFlags(canvas);
     _drawBalls(canvas);
     _drawCooldown(canvas);
     _drawAim(canvas);
@@ -162,16 +163,6 @@ class ForeGame extends FlameGame {
           }
         }
       }
-      if (battle.selectedTowerId == t.id) {
-        canvas.drawCircle(
-          _o(t.pos),
-          r + 9,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.5
-            ..color = const Color(0xFFFFFFFF),
-        );
-      }
       if (t.overcharge > 0) {
         canvas.drawCircle(_o(t.pos), r + 5 + math.sin(_time * 20) * 2, Paint()..color = const Color(0x66FFEB3B));
       }
@@ -194,6 +185,7 @@ class ForeGame extends FlameGame {
       for (var i = 0; i < t.level; i++) {
         canvas.drawCircle(Offset(t.pos.x - r + 4 + i * 6, t.pos.y + r - 4), 2, Paint()..color = const Color(0xFFFFFFFF));
       }
+      if (t.boostCharge > 0) _bar(canvas, t.pos + V2(0, r + 4), r * 2, t.boostCharge / towerBoostHits, const Color(0xFFFFEB3B));
       if (t.hp < t.maxHp) _bar(canvas, t.pos - V2(0, r + 5), r * 2, t.hp / t.maxHp, const Color(0xFF64B5F6));
       if (t.stun > 0) _label(canvas, 'zz', t.pos - V2(0, r + 12), 10, const Color(0xFFFFFFFF));
     }
@@ -300,6 +292,28 @@ class ForeGame extends FlameGame {
   }
 
   // ------------------------------------------------------------------ balls
+
+  void _drawFlags(Canvas canvas) {
+    for (final f in battle.pins) {
+      final c = _o(f.pos);
+      // Blink as the flag is about to leave.
+      if (f.ttl < 2 && (f.ttl * 6).floor().isEven) continue;
+      canvas.drawCircle(c, flagRadius, Paint()..color = const Color(0xFF000000));
+      canvas.drawCircle(c, flagRadius, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0xFFFFEB3B));
+      canvas.drawLine(c, c - const Offset(0, 34), Paint()
+        ..color = const Color(0xFFFFFFFF)
+        ..strokeWidth = 2);
+      final pennant = Path()
+        ..moveTo(c.dx, c.dy - 34)
+        ..lineTo(c.dx + 16, c.dy - 28)
+        ..lineTo(c.dx, c.dy - 22)
+        ..close();
+      canvas.drawPath(pennant, Paint()..color = const Color(0xFFE53935));
+    }
+  }
 
   void _drawBalls(Canvas canvas) {
     final white = Paint()..color = const Color(0xFFFFFFFF);

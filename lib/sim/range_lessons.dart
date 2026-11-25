@@ -88,7 +88,7 @@ final List<RangeLesson> rangeLessons = [
     body: 'Towers shoot for you, but only from the glowing plots around the clubhouse. Tap an empty plot to build. Coins are free on the range.',
     tips: [
       'In a real round, build between holes. Building mid-hole costs double.',
-      'Long-press a tower to upgrade it (3 levels) or sell it for 70% back.',
+      'Tap a tower to upgrade it (3 levels) or sell it for 70% back.',
       for (final t in towers) '${t.name}: ${t.role}. ${t.synergy}.',
     ],
     goal: 'Build a tower',
@@ -96,9 +96,9 @@ final List<RangeLesson> rangeLessons = [
   ),
   RangeLesson(
     title: 'Overcharge',
-    body: 'Your balls pass straight through your own towers. Instead, tap a tower to select it (tap again to deselect). Your Sweet Spot hits and Fore! bursts then overcharge the selected tower.',
-    tips: const ['Only one tower is selected at a time, and the selection carries to the next hole.'],
-    goal: 'Select a tower and land a Sweet Spot',
+    body: 'Your balls pass straight through your own towers. Each ball that flies through a tower fills its yellow boost bar; after 3 passes that tower is overcharged. Flags also pop up now and then: sink a ball in one and every tower is overcharged.',
+    tips: const ['Flags blink just before they vanish, so aim quickly. Build a tower first: flags only appear once you have one.'],
+    goal: 'Boost a tower',
     done: (b) => b.towerCharges >= 1,
   ),
   RangeLesson(

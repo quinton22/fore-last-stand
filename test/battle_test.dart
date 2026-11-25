@@ -216,7 +216,7 @@ void main() {
     expect(before - e.hp, closeTo(dry * 1.5, 1e-9));
   });
 
-  group('ghost balls and tower selection', () {
+  group('ghost balls and flag boosts', () {
     Tower setup(Battle b) {
       final plot = b.plotAt(const V2(180, 560))!;
       b.placeTower('ball_machine', plot.$1, plot.$2);
@@ -226,7 +226,6 @@ void main() {
     test('balls pass through towers without charging them', () {
       final b = quick(coins: 500);
       final t = setup(b);
-      b.toggleSelect(t);
       b.beginSwing();
       final ball = b.releaseSwing(teePosition.x - t.pos.x, teePosition.y - t.pos.y)!;
       runUntil(b, () => ball.done, seconds: 3);
@@ -235,69 +234,61 @@ void main() {
       expect(ball.pos.y, lessThan(t.pos.y)); // flew past it
     });
 
-    test('tapping selects, tapping again deselects, only one at a time', () {
+    test('three balls through a tower fill its bar and boost it', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      for (var i = 0; i < 3; i++) {
+        expect(t.overcharge, 0);
+        b.swingCooldown = 0;
+        b.beginSwing();
+        final ball = b.releaseSwing(teePosition.x - t.pos.x, teePosition.y - t.pos.y)!;
+        runUntil(b, () => ball.done, seconds: 3);
+        if (i < 2) expect(t.boostCharge, i + 1);
+      }
+      expect(t.overcharge, greaterThan(0));
+      expect(t.boostCharge, 0);
+    });
+
+    test('a Sweet Spot no longer charges a tower on its own', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      b.beginSwing();
+      b.dragTime = 0.5 * 1.1;
+      b.releaseSwing(0, 100);
+      expect(t.overcharge, 0);
+    });
+
+    test('flags pop up on the course over time', () {
+      final b = quick(coins: 500);
+      setup(b);
+      runUntil(b, () => b.pins.isNotEmpty, seconds: flagMaxGap + 1);
+      expect(b.pins, isNotEmpty);
+    });
+
+    test('sinking a ball in a flag overcharges every tower', () {
       final b = quick(coins: 500);
       final t1 = setup(b);
       b.placeTower('sniper', 0, 0);
       final t2 = b.towerAt(0, 0)!;
-      b.toggleSelect(t1);
-      expect(b.selectedTower, t1);
-      b.toggleSelect(t2);
-      expect(b.selectedTower, t2);
-      b.toggleSelect(t2);
-      expect(b.selectedTower, isNull);
-    });
-
-    test('a Sweet Spot charges only the selected tower', () {
-      final b = quick(coins: 500);
-      final t = setup(b);
-      b.placeTower('sniper', 0, 0);
-      final other = b.towerAt(0, 0)!;
-      b.toggleSelect(t);
+      final flag = Pin(const V2(180, 300), 10);
+      b.pins.add(flag);
       b.beginSwing();
-      b.dragTime = 0.5 * 1.1;
-      b.releaseSwing(0, 100);
-      expect(t.overcharge, closeTo(3, 1e-9));
-      expect(other.overcharge, 0);
+      final ball = b.releaseSwing(0, 100)!;
+      runUntil(b, () => flag.sunk || ball.done, seconds: 3);
+      expect(flag.sunk, isTrue);
+      expect(ball.done, isTrue); // the ball drops into the hole
+      expect(t1.overcharge, greaterThan(0));
+      expect(t2.overcharge, greaterThan(0));
     });
 
-    test('with nothing selected a Sweet Spot charges nothing', () {
+    test('a flag that is missed expires', () {
       final b = quick(coins: 500);
-      final t = setup(b);
-      b.beginSwing();
-      b.dragTime = 0.5 * 1.1;
-      b.releaseSwing(0, 100);
-      expect(t.overcharge, 0);
-    });
-
-    test('a normal swing does not charge the selected tower', () {
-      final b = quick(coins: 500);
-      final t = setup(b);
-      b.toggleSelect(t);
-      b.beginSwing();
-      b.dragTime = 0; // outside the green zone
-      b.releaseSwing(0, 100);
-      expect(t.overcharge, 0);
-    });
-
-    test('Fore! charges the selected tower for the burst plus a tail', () {
-      final b = quick(coins: 500);
-      final t = setup(b);
-      b.toggleSelect(t);
-      b.foreMeter = 100;
-      b.triggerFore();
-      expect(t.overcharge, closeTo(3 + foreChargeTail, 1e-9));
-    });
-
-    test('selection survives a hole and clears when the tower is sold', () {
-      final b = quick(coins: 500);
-      final t = setup(b);
-      b.toggleSelect(t);
-      clearHole(b);
-      expect(b.selectedTower, t);
-      b.pickPerk(0); // drafting -> building, so selling is allowed again
-      b.sellTower(t);
-      expect(b.selectedTowerId, isNull);
+      setup(b);
+      b.pins.add(Pin(const V2(40, 100), 1));
+      for (var i = 0; i < 120; i++) {
+        b.update(0.05); // placing live triggers slow-mo, so give it extra time
+      }
+      expect(b.pins.any((f) => f.pos.x == 40 && f.pos.y == 100), isFalse);
     });
   });
 
