@@ -123,62 +123,7 @@ class HomeScreen extends StatelessWidget {
                     onTap: () => _range(context),
                   ),
                 ),
-                if (!p.tutorialSeen.contains('welcome'))
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Expanded(
-                                child: Text(
-                                  'Welcome to Fore! Last Stand',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Dismiss',
-                                onPressed: () => store.update(
-                                  (p) => p.tutorialSeen.add('welcome'),
-                                ),
-                                icon: const Icon(Icons.close),
-                              ),
-                            ],
-                          ),
-                          const Text(
-                            'The course is overrun with zombie animals and you are the last one standing. Two places to learn the ropes:\n\n'
-                            '⛳ Driving Range: a guided tutorial on swinging, clubs, towers and Mulligan cards, then free practice on targets.\n\n'
-                            '📖 Bestiary: what every animal does and which clubs and towers counter it.',
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              FilledButton(
-                                onPressed: () => _range(context),
-                                child: const Text('Open Driving Range'),
-                              ),
-                              OutlinedButton(
-                                onPressed: () {
-                                  store.update(
-                                    (p) => p.tutorialSeen.add('welcome'),
-                                  );
-                                  _open(context, BestiaryScreen(store: store));
-                                },
-                                child: const Text('Read animal guide'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 16),
+
                 for (final u in nearestUnlocks(p))
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -207,41 +152,6 @@ class HomeScreen extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _NavButton extends StatelessWidget {
-  const _NavButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.lockedText,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final String? lockedText;
-
-  @override
-  Widget build(BuildContext context) {
-    final locked = lockedText != null;
-    return SizedBox(
-      width: 104,
-      child: FilledButton.tonal(
-        onPressed: locked ? null : onTap,
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-        child: Column(
-          children: [
-            Icon(locked ? Icons.lock : icon),
-            Text(label),
-            if (locked) Text(lockedText!, style: const TextStyle(fontSize: 10)),
-          ],
-        ),
-      ),
     );
   }
 }

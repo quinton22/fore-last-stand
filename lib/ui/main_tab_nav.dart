@@ -1,3 +1,5 @@
+import 'package:fore_last_stand/meta/progression.dart';
+import 'package:fore_last_stand/ui/run_screen.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:fore_last_stand/ui/home_screen.dart';
 import 'package:fore_last_stand/meta/profile_store.dart';
@@ -18,6 +20,104 @@ class MainTabNav extends StatefulWidget {
 
 class _MainTabNavState extends State<MainTabNav> {
   int _currentIndex = 2; // start on home_screen
+
+  void _goToTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  void _welcomeTutorialSeen() {
+    widget.store.update((p) {
+      if (!p.tutorialSeen.contains('welcome')) {
+        p.tutorialSeen.add('welcome');
+      }
+    });
+  }
+
+  Widget _buildTutorialCard(ProfileStore store) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Welcome to Fore! Last Stand',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Dismiss',
+              onPressed: () {
+                _welcomeTutorialSeen();
+                Navigator.of(context).pop();
+              },
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
+        const Text(
+          'The course is overrun with zombie animals and you are the last one standing. Two places to learn the ropes:\n\n'
+          '⛳ Driving Range: a guided tutorial on swinging, clubs, towers and Mulligan cards, then free practice on targets.\n\n'
+          '📖 Bestiary: what every animal does and which clubs and towers counter it.',
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            FilledButton(
+              onPressed: () {
+                widget.store.update((p) {
+                  if (!p.tutorialSeen.contains('welcome')) {
+                    p.tutorialSeen.add('welcome');
+                  }
+                });
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => RunScreen(
+                      store: widget.store,
+                      config: rangeConfigFor(widget.store.profile),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Open Driving Range'),
+            ),
+            OutlinedButton(
+              onPressed: () {
+                _welcomeTutorialSeen();
+                _goToTab(4);
+              },
+              child: const Text('Read animal guide'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showTutorialCardIfNeeded() {
+    final store = widget.store;
+    final p = store.profile;
+    if (!p.tutorialSeen.contains('welcome')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(content: _buildTutorialCard(store)),
+        );
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _showTutorialCardIfNeeded();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,9 +150,7 @@ class _MainTabNavState extends State<MainTabNav> {
             onTap: (index) {
               if (index == 0 && !p.bagUnlocked) return;
               if (index == 1 && !p.clubhouseUnlocked) return;
-              setState(() {
-                _currentIndex = index;
-              });
+              _goToTab(index);
             },
             items: [
               BottomNavigationBarItem(
