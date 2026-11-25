@@ -96,9 +96,9 @@ final List<RangeLesson> rangeLessons = [
   ),
   RangeLesson(
     title: 'Overcharge',
-    body: 'Your balls pass straight through your own towers. Instead, flags pop up on the course every so often. Sink a ball in one and every tower is overcharged.',
+    body: 'Your balls pass straight through your own towers. Each ball that flies through a tower fills its yellow boost bar; after 3 passes that tower is overcharged. Flags also pop up now and then: sink a ball in one and every tower is overcharged.',
     tips: const ['Flags blink just before they vanish, so aim quickly. Build a tower first: flags only appear once you have one.'],
-    goal: 'Sink a ball in a flag',
+    goal: 'Boost a tower',
     done: (b) => b.towerCharges >= 1,
   ),
   RangeLesson(

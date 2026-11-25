@@ -234,6 +234,21 @@ void main() {
       expect(ball.pos.y, lessThan(t.pos.y)); // flew past it
     });
 
+    test('three balls through a tower fill its bar and boost it', () {
+      final b = quick(coins: 500);
+      final t = setup(b);
+      for (var i = 0; i < 3; i++) {
+        expect(t.overcharge, 0);
+        b.swingCooldown = 0;
+        b.beginSwing();
+        final ball = b.releaseSwing(teePosition.x - t.pos.x, teePosition.y - t.pos.y)!;
+        runUntil(b, () => ball.done, seconds: 3);
+        if (i < 2) expect(t.boostCharge, i + 1);
+      }
+      expect(t.overcharge, greaterThan(0));
+      expect(t.boostCharge, 0);
+    });
+
     test('a Sweet Spot no longer charges a tower on its own', () {
       final b = quick(coins: 500);
       final t = setup(b);

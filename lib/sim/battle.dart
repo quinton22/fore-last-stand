@@ -32,6 +32,9 @@ const double flagLifetime = 7;
 const double flagMinGap = 8;
 const double flagMaxGap = 14;
 
+/// Balls that must pass through a tower to fill its boost bar and boost it.
+const int towerBoostHits = 3;
+
 /// Radius of a flag's hole.
 const double flagRadius = 9;
 
@@ -1097,14 +1100,21 @@ class Battle {
   /// Overcharges every tower (spec 3/4). Balls pass through towers, so the
   /// boost comes from sinking a ball in a flag's hole.
   void _boostAllTowers() {
-    towerCharges++;
-    final seconds = flagBoostSeconds + perkSum(PerkEffect.overchargeDuration);
     for (final t in towers) {
-      if (t.removed) continue;
-      t.overcharge = math.max(t.overcharge, seconds);
-      if (t.spec.kind == TowerKind.cartCannon) t.cooldown = 0;
-      fx.add(Fx(FxKind.sweet, [t.pos], ttl: 0.3, radius: towerRadius + 8, colorValue: 0xFFFFEB3B));
+      if (!t.removed) _boostTower(t, quiet: true);
     }
+    _tagComment();
+  }
+
+  void _boostTower(Tower t, {bool quiet = false}) {
+    towerCharges++;
+    t.overcharge = math.max(t.overcharge, flagBoostSeconds + perkSum(PerkEffect.overchargeDuration));
+    if (t.spec.kind == TowerKind.cartCannon) t.cooldown = 0;
+    fx.add(Fx(FxKind.sweet, [t.pos], ttl: 0.3, radius: towerRadius + 8, colorValue: 0xFFFFEB3B));
+    if (!quiet) _tagComment();
+  }
+
+  void _tagComment() {
     if (_tagCommentCooldown <= 0) {
       _tagCommentCooldown = 6;
       say(CommentEvent.towerTag);
@@ -1189,8 +1199,23 @@ class Battle {
           b.done = true;
           break;
         }
+        _ballTowers(b);
         _ballEnemies(b);
       }
+    }
+  }
+
+  /// Balls pass through towers; each pass fills the tower's boost bar, and a
+  /// full bar overcharges that tower.
+  void _ballTowers(Ball b) {
+    for (final t in towers) {
+      if (t.removed || b.towerIds.contains(t.id)) continue;
+      if (t.pos.distanceTo(b.pos) > towerRadius + b.radius) continue;
+      b.towerIds.add(t.id);
+      t.boostCharge++;
+      if (t.boostCharge < towerBoostHits) continue;
+      t.boostCharge = 0;
+      _boostTower(t);
     }
   }
 

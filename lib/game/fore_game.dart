@@ -185,6 +185,7 @@ class ForeGame extends FlameGame {
       for (var i = 0; i < t.level; i++) {
         canvas.drawCircle(Offset(t.pos.x - r + 4 + i * 6, t.pos.y + r - 4), 2, Paint()..color = const Color(0xFFFFFFFF));
       }
+      if (t.boostCharge > 0) _bar(canvas, t.pos + V2(0, r + 4), r * 2, t.boostCharge / towerBoostHits, const Color(0xFFFFEB3B));
       if (t.hp < t.maxHp) _bar(canvas, t.pos - V2(0, r + 5), r * 2, t.hp / t.maxHp, const Color(0xFF64B5F6));
       if (t.stun > 0) _label(canvas, 'zz', t.pos - V2(0, r + 12), 10, const Color(0xFFFFFFFF));
     }
