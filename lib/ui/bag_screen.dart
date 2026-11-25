@@ -1,3 +1,4 @@
+import 'package:fore_last_stand/meta/profile.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../data/clubs.dart';
@@ -21,7 +22,9 @@ class BagScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(12),
             children: [
-              const Text('Equip up to 3 clubs. Swap between them with a tap during a round.'),
+              const Text(
+                'Equip up to 3 clubs. Swap between them with a tap during a round.',
+              ),
               const SizedBox(height: 8),
               for (final c in clubs) _clubCard(context, c),
             ],
@@ -29,6 +32,16 @@ class BagScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  void _toggleBag(BuildContext context, String clubId) {
+    try {
+      store.update((p) => toggleBag(p, clubId));
+    } on ToggleBagException catch (e) {
+      // Handle bag full or empty error if needed
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   Widget _clubCard(BuildContext context, ClubSpec c) {
@@ -43,36 +56,57 @@ class BagScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Expanded(child: Text(c.name, style: Theme.of(context).textTheme.titleMedium)),
-              if (unlocked) Text('Level $level/$maxClubLevel'),
-            ]),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    c.name,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (unlocked) Text('Level $level/$maxClubLevel'),
+              ],
+            ),
             Text('Best against: ${c.bestAgainst}'),
-            Text('Damage ${(c.damage * (1 + 0.05 * (level - 1))).toStringAsFixed(1)} · pierce ${c.pierce} · bounces ${c.bounces}'
-                '${c.blastRadius > 0 ? ' · blast ${c.blastRadius.round()}' : ''}'),
-            if (unlocked) Text(clubTrait(level), style: const TextStyle(fontStyle: FontStyle.italic)),
+            Text(
+              'Damage ${(c.damage * (1 + 0.05 * (level - 1))).toStringAsFixed(1)} · pierce ${c.pierce} · bounces ${c.bounces}'
+              '${c.blastRadius > 0 ? ' · blast ${c.blastRadius.round()}' : ''}',
+            ),
+            if (unlocked)
+              Text(
+                clubTrait(level),
+                style: const TextStyle(fontStyle: FontStyle.italic),
+              ),
             const SizedBox(height: 8),
             if (!unlocked)
               FilledButton(
-                onPressed: p.clubTokens >= c.unlockTokens ? () => store.update((p) => unlockClub(p, c.id)) : null,
+                onPressed: p.clubTokens >= c.unlockTokens
+                    ? () => store.update((p) => unlockClub(p, c.id))
+                    : null,
                 child: Text('Unlock 🎟 ${c.unlockTokens}'),
               )
             else
-              Row(children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: level < maxClubLevel && p.clubTokens >= cost ? () => store.update((p) => upgradeClub(p, c.id)) : null,
-                    child: Text(level < maxClubLevel ? 'Level up 🎟 $cost' : 'Maxed'),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: level < maxClubLevel && p.clubTokens >= cost
+                          ? () => store.update((p) => upgradeClub(p, c.id))
+                          : null,
+                      child: Text(
+                        level < maxClubLevel ? 'Level up 🎟 $cost' : 'Maxed',
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => store.update((p) => toggleBag(p, c.id)),
-                    child: Text(inBag ? 'In bag ✓' : 'Add to bag'),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _toggleBag(context, c.id),
+                      child: Text(inBag ? 'In bag ✓' : 'Add to bag'),
+                    ),
                   ),
-                ),
-              ]),
+                ],
+              ),
           ],
         ),
       ),

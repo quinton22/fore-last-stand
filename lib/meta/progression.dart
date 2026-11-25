@@ -12,16 +12,22 @@ const int maxClubLevel = 20;
 int clubUpgradeCost(int level) => 10 + 6 * level;
 
 String clubTrait(int level) => switch (level) {
-      >= 20 => 'Trait IV: legend grip',
-      >= 15 => 'Trait III: tour spin',
-      >= 10 => 'Trait II: pro shaft',
-      >= 5 => 'Trait I: soft feel',
-      _ => 'No trait yet (level 5)',
-    };
+  >= 20 => 'Trait IV: legend grip',
+  >= 15 => 'Trait III: tour spin',
+  >= 10 => 'Trait II: pro shaft',
+  >= 5 => 'Trait I: soft feel',
+  _ => 'No trait yet (level 5)',
+};
 
 /// Clubhouse upgrade tree (spec 7: grows the grid, adds starting coins, hit points).
 class ClubhouseUpgrade {
-  const ClubhouseUpgrade(this.id, this.name, this.description, this.maxLevel, this.baseCost);
+  const ClubhouseUpgrade(
+    this.id,
+    this.name,
+    this.description,
+    this.maxLevel,
+    this.baseCost,
+  );
 
   final String id;
   final String name;
@@ -33,24 +39,43 @@ class ClubhouseUpgrade {
 }
 
 const List<ClubhouseUpgrade> clubhouseUpgrades = [
-  ClubhouseUpgrade('grid', 'Grounds Expansion', 'Grow the plot grid: 4x4 -> 5x5 -> 6x6.', 2, 250),
-  ClubhouseUpgrade('coins', 'Pro Shop Float', '+20 starting coins per level.', 5, 60),
-  ClubhouseUpgrade('walls', 'Reinforced Walls', '+20 clubhouse HP per level.', 5, 80),
+  ClubhouseUpgrade(
+    'grid',
+    'Grounds Expansion',
+    'Grow the plot grid: 4x4 -> 5x5 -> 6x6.',
+    2,
+    250,
+  ),
+  ClubhouseUpgrade(
+    'coins',
+    'Pro Shop Float',
+    '+20 starting coins per level.',
+    5,
+    60,
+  ),
+  ClubhouseUpgrade(
+    'walls',
+    'Reinforced Walls',
+    '+20 clubhouse HP per level.',
+    5,
+    80,
+  ),
 ];
 
-ClubhouseUpgrade clubhouseUpgradeById(String id) => clubhouseUpgrades.firstWhere((u) => u.id == id);
+ClubhouseUpgrade clubhouseUpgradeById(String id) =>
+    clubhouseUpgrades.firstWhere((u) => u.id == id);
 
 /// Driving Range: every club, free coins, and no waves.
 RunConfig rangeConfigFor(Profile p) => RunConfig(
-      mode: modeById(ModeId.quickRound),
-      seed: DateTime.now().microsecondsSinceEpoch & 0x7fffffff,
-      bag: clubs.map((c) => c.id).toList(),
-      clubLevels: Map.of(p.clubLevels),
-      gridSize: 4 + p.clubhouseLevel('grid'),
-      startingCoins: 9999,
-      aimAssist: p.settings.aimAssist,
-      range: true,
-    );
+  mode: modeById(ModeId.quickRound),
+  seed: DateTime.now().microsecondsSinceEpoch & 0x7fffffff,
+  bag: clubs.map((c) => c.id).toList(),
+  clubLevels: Map.of(p.clubLevels),
+  gridSize: 4 + p.clubhouseLevel('grid'),
+  startingCoins: 9999,
+  aimAssist: p.settings.aimAssist,
+  range: true,
+);
 
 /// Builds a run config from the profile.
 RunConfig configFor(Profile p, ModeId modeId, {DateTime? now}) {
@@ -68,7 +93,10 @@ RunConfig configFor(Profile p, ModeId modeId, {DateTime? now}) {
     modifier: modifier,
     bag: List.of(p.bag),
     clubLevels: Map.of(p.clubLevels),
-    caddieId: p.equippedCaddie != null && p.caddiesUnlocked.contains(p.equippedCaddie) ? p.equippedCaddie : null,
+    caddieId:
+        p.equippedCaddie != null && p.caddiesUnlocked.contains(p.equippedCaddie)
+        ? p.equippedCaddie
+        : null,
     gridSize: 4 + p.clubhouseLevel('grid'),
     startingCoins: 60 + 20 * p.clubhouseLevel('coins'),
     bonusClubhouseHp: 20.0 * p.clubhouseLevel('walls'),
@@ -81,7 +109,12 @@ RunConfig configFor(Profile p, ModeId modeId, {DateTime? now}) {
 }
 
 class Rewards {
-  const Rewards({required this.coins, required this.tokens, required this.xp, this.unlockedCaddie});
+  const Rewards({
+    required this.coins,
+    required this.tokens,
+    required this.xp,
+    this.unlockedCaddie,
+  });
 
   final int coins;
   final int tokens;
@@ -110,7 +143,8 @@ Rewards applyRun(Profile p, RunResult r, {int? dailySeedUsed}) {
     final id = e.key == 'coyote_pup' ? 'coyote' : e.key;
     p.bestiary[id] = (p.bestiary[id] ?? 0) + e.value;
   }
-  if (r.mode == ModeId.suddenDeath) p.bestSuddenDeath = math.max(p.bestSuddenDeath, r.holesCleared);
+  if (r.mode == ModeId.suddenDeath)
+    p.bestSuddenDeath = math.max(p.bestSuddenDeath, r.holesCleared);
   if (r.mode == ModeId.dailyTournament && dailySeedUsed != null) {
     if (p.lastDailySeed != dailySeedUsed) p.bestDailyScore = 0;
     p.lastDailySeed = dailySeedUsed;
@@ -121,7 +155,12 @@ Rewards applyRun(Profile p, RunResult r, {int? dailySeedUsed}) {
   if (!p.caddiesUnlocked.contains(first.id)) {
     p.caddiesUnlocked.add(first.id);
     p.equippedCaddie ??= first.id;
-    rewards = Rewards(coins: rewards.coins, tokens: rewards.tokens, xp: rewards.xp, unlockedCaddie: first.id);
+    rewards = Rewards(
+      coins: rewards.coins,
+      tokens: rewards.tokens,
+      xp: rewards.xp,
+      unlockedCaddie: first.id,
+    );
   }
   return rewards;
 }
@@ -131,7 +170,10 @@ Rewards applyRun(Profile p, RunResult r, {int? dailySeedUsed}) {
 bool upgradeClub(Profile p, String clubId) {
   final level = p.clubLevel(clubId);
   final cost = clubUpgradeCost(level);
-  if (!p.unlockedClubs.contains(clubId) || level >= maxClubLevel || p.clubTokens < cost) return false;
+  if (!p.unlockedClubs.contains(clubId) ||
+      level >= maxClubLevel ||
+      p.clubTokens < cost)
+    return false;
   p.clubTokens -= cost;
   p.clubLevels[clubId] = level + 1;
   return true;
@@ -139,23 +181,43 @@ bool upgradeClub(Profile p, String clubId) {
 
 bool unlockClub(Profile p, String clubId) {
   final c = clubById(clubId);
-  if (p.unlockedClubs.contains(clubId) || p.clubTokens < c.unlockTokens) return false;
+  if (p.unlockedClubs.contains(clubId) || p.clubTokens < c.unlockTokens)
+    return false;
   p.clubTokens -= c.unlockTokens;
   p.unlockedClubs.add(clubId);
   return true;
 }
 
+abstract class ToggleBagException implements Exception {
+  @override
+  String toString();
+}
+
+class BagFullException implements ToggleBagException {
+  @override
+  String toString() => 'Bag is already full';
+}
+
+class BagEmptyException implements ToggleBagException {
+  @override
+  String toString() => 'Cannot empty bag';
+}
+
+class ClubLockedException implements Exception {
+  @override
+  String toString() => 'Club is locked';
+}
+
 /// Toggles a club in the 3-club bag. The bag never empties and never exceeds 3.
-bool toggleBag(Profile p, String clubId) {
-  if (!p.unlockedClubs.contains(clubId)) return false;
+void toggleBag(Profile p, String clubId) {
+  if (!p.unlockedClubs.contains(clubId)) throw ClubLockedException();
   if (p.bag.contains(clubId)) {
-    if (p.bag.length <= 1) return false;
+    if (p.bag.length <= 1) throw BagEmptyException();
     p.bag.remove(clubId);
-    return true;
+    return;
   }
-  if (p.bag.length >= 3) return false;
+  if (p.bag.length >= 3) throw BagFullException();
   p.bag.add(clubId);
-  return true;
 }
 
 bool buyClubhouseUpgrade(Profile p, String id) {
@@ -192,15 +254,27 @@ class NearUnlock {
 List<NearUnlock> nearestUnlocks(Profile p) {
   final all = <NearUnlock>[
     for (final c in clubs)
-      if (!p.unlockedClubs.contains(c.id)) NearUnlock('Unlock ${c.name}', p.clubTokens, c.unlockTokens, 'tokens'),
+      if (!p.unlockedClubs.contains(c.id))
+        NearUnlock('Unlock ${c.name}', p.clubTokens, c.unlockTokens, 'tokens'),
     for (final id in p.unlockedClubs)
       if (p.clubLevel(id) < maxClubLevel)
-        NearUnlock('${clubById(id).name} level ${p.clubLevel(id) + 1}', p.clubTokens, clubUpgradeCost(p.clubLevel(id)), 'tokens'),
+        NearUnlock(
+          '${clubById(id).name} level ${p.clubLevel(id) + 1}',
+          p.clubTokens,
+          clubUpgradeCost(p.clubLevel(id)),
+          'tokens',
+        ),
     for (final u in clubhouseUpgrades)
       if (p.clubhouseLevel(u.id) < u.maxLevel)
-        NearUnlock('${u.name} ${p.clubhouseLevel(u.id) + 1}', p.coins, u.cost(p.clubhouseLevel(u.id)), 'coins'),
+        NearUnlock(
+          '${u.name} ${p.clubhouseLevel(u.id) + 1}',
+          p.coins,
+          u.cost(p.clubhouseLevel(u.id)),
+          'coins',
+        ),
     for (final c in caddies)
-      if (!p.caddiesUnlocked.contains(c.id) && c.unlockCoins > 0) NearUnlock('Caddie ${c.name}', p.coins, c.unlockCoins, 'coins'),
+      if (!p.caddiesUnlocked.contains(c.id) && c.unlockCoins > 0)
+        NearUnlock('Caddie ${c.name}', p.coins, c.unlockCoins, 'coins'),
   ];
   all.sort((a, b) => b.progress.compareTo(a.progress));
   return all.take(3).toList();
