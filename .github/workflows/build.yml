@@ -17,7 +17,10 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || inputs.target != 'ios'
     runs-on: ubuntu-latest
     steps:
+      # For workflow_dispatch, github.ref is the branch selected in the Run workflow dialog.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -42,6 +45,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
