@@ -90,16 +90,16 @@ void main() {
 
   test('the bag: unlock putter with tokens, keep 1-3 clubs equipped, level up', () {
     final p = Profile(clubTokens: 1000);
-    expect(toggleBag(p, 'putter'), isFalse, reason: 'locked');
+    expect(() => toggleBag(p, 'putter'), throwsA(isA<ClubLockedException>()));
     expect(unlockClub(p, 'putter'), isTrue);
-    expect(toggleBag(p, 'putter'), isFalse, reason: 'bag is full');
-    expect(toggleBag(p, 'wedge'), isTrue);
-    expect(toggleBag(p, 'putter'), isTrue);
+    expect(() => toggleBag(p, 'putter'), throwsA(isA<BagFullException>()));
+    toggleBag(p, 'wedge');
+    toggleBag(p, 'putter');
     expect(p.bag, ['driver', 'iron', 'putter']);
     expect(upgradeClub(p, 'driver'), isTrue);
     expect(p.clubLevel('driver'), 2);
     p.bag = ['driver'];
-    expect(toggleBag(p, 'driver'), isFalse, reason: 'never empty');
+    expect(() => toggleBag(p, 'driver'), throwsA(isA<BagEmptyException>()));
   });
 
   test('dottie can be hired with coins', () {
