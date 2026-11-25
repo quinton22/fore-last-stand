@@ -261,6 +261,7 @@ void main() {
       final ball = b.releaseSwing(0, 100)!;
       runUntil(b, () => flag.sunk || ball.done, seconds: 3);
       expect(flag.sunk, isTrue);
+      expect(ball.done, isTrue); // the ball drops into the hole
       expect(t1.overcharge, greaterThan(0));
       expect(t2.overcharge, greaterThan(0));
     });

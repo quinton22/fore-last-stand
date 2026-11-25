@@ -33,7 +33,7 @@ const double flagMinGap = 8;
 const double flagMaxGap = 14;
 
 /// Radius of a flag's hole.
-const double flagRadius = 18;
+const double flagRadius = 9;
 
 enum Phase { playing, drafting, building, won, lost }
 
@@ -1124,15 +1124,19 @@ class Battle {
     pins.add(Pin(pos, flagLifetime));
   }
 
-  /// Sinks a ball at [at] into any flag whose hole it reaches.
-  void _checkFlags(V2 at, double radius) {
+  /// Sinks a ball at [at] into any flag whose hole it reaches. Returns true if
+  /// a flag was sunk. A direct ball must nearly cover the hole to drop in.
+  bool _checkFlags(V2 at, double radius, {double reach = 0.4}) {
+    var sunk = false;
     for (final f in pins) {
-      if (f.sunk || f.pos.distanceTo(at) > flagRadius + radius) continue;
+      if (f.sunk || f.pos.distanceTo(at) > flagRadius + radius * reach) continue;
       f.sunk = true;
-      fx.add(Fx(FxKind.sweet, [f.pos], ttl: 0.4, radius: 36, colorValue: 0xFFFFEB3B));
+      sunk = true;
+      fx.add(Fx(FxKind.sweet, [f.pos], ttl: 0.4, radius: 26, colorValue: 0xFFFFEB3B));
       fx.add(Fx(FxKind.text, [f.pos - const V2(0, 20)], ttl: 1, text: 'Boost!', colorValue: 0xFFFFEB3B));
       _boostAllTowers();
     }
+    return sunk;
   }
 
   // ---------------------------------------------------------------- balls
@@ -1151,7 +1155,7 @@ class Battle {
         final p = (b.lobTime / b.lobTotal).clamp(0.0, 1.0);
         b.pos = b.lobStart! + (b.lobTarget! - b.lobStart!) * p;
         if (p >= 1) {
-          _checkFlags(b.lobTarget!, b.club.blastRadius);
+          _checkFlags(b.lobTarget!, b.club.blastRadius, reach: 0.15);
           _landLob(b);
         }
         continue;
@@ -1179,7 +1183,12 @@ class Battle {
         b.pos = b.pos + b.vel * step;
         _ballWalls(b);
         if (b.done) break;
-        _checkFlags(b.pos, b.radius);
+        if (!b.mega && _checkFlags(b.pos, b.radius)) {
+          // The ball drops into the hole and vanishes; it isn't a miss.
+          b.hitSomething = true;
+          b.done = true;
+          break;
+        }
         _ballEnemies(b);
       }
     }
