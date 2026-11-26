@@ -30,6 +30,7 @@ RoundSim sim(
   String? caddie,
   String? boost,
   bool revive = false,
+  int extraPlots = 0,
 }) {
   final course = c.course(muni);
   return RoundSim(
@@ -46,6 +47,7 @@ RoundSim sim(
       caddieId: caddie,
       boost: boost,
       reviveAvailable: revive,
+      extraPlots: extraPlots,
     ),
   );
 }

@@ -35,7 +35,7 @@ void main() {
     s.beginAim();
     final ball = s.release(0, 120).single;
     expect(ball.vel.y, lessThan(0));
-    expect(ball.distance, closeTo(420, 1e-9), reason: 'iron range at full power');
+    expect(ball.distance, closeTo(565, 1e-9), reason: 'iron range at full power');
     expect(ball.damage, closeTo(20, 1e-9));
   });
 
@@ -94,18 +94,19 @@ void main() {
   test('Fore! meter: +4 per hit, +8 per sweet hit; burst fires 20 balls over 3 s', () {
     final s = sim(c, bag: ['driver_used', null, null])..teeOff();
     s.enemies.clear();
-    final e = s.spawnEnemy('gator', at: const V2(195, 400));
+    // Close to the golfer, and short swings, so no other spawn is in the way.
+    final e = s.spawnEnemy('gator', at: const V2(195, 600));
     e.slowTimer = 99;
     e.slowAmount = 1;
     s.beginAim();
-    s.release(0, 120);
+    s.release(0, 24);
     runUntil(s, () => s.balls.isEmpty, seconds: 2);
     expect(s.foreMeter, 4);
     expect(s.comboRung, 1);
     s.cooldowns[0] = 0;
     s.beginAim();
     s.aimTime = 0.65;
-    s.release(0, 120);
+    s.release(0, 24);
     runUntil(s, () => s.balls.isEmpty, seconds: 2);
     expect(s.foreMeter, 12);
     s.foreMeter = 100;
@@ -228,7 +229,7 @@ void main() {
 
   test('towers take damage from enemies in their way and are destroyed at 0', () {
     final s = sim(c, coins: 1000);
-    final t = s.placeTower('range', 1, 0)!;
+    final t = s.placeTower('range', 1, 1)!;
     expect(t.hp, 60);
     s.teeOff();
     s.enemies.clear();
@@ -248,7 +249,7 @@ void main() {
 
   test('squirrels blow up the tower they reach; upgrading repairs a tower', () {
     final s = sim(c, hole: 9, coins: 1000);
-    final t = s.placeTower('cannon', 2, 0)!;
+    final t = s.placeTower('cannon', 2, 1)!;
     s.teeOff();
     s.enemies.clear();
     final sq = s.spawnEnemy('squirrel', at: t.pos - const V2(0, 60));
@@ -263,7 +264,7 @@ void main() {
   test('towers: same cost any time, no slow motion, 70% refund, 3 levels', () {
     final s = sim(c, hole: 1, coins: 1000);
     expect(s.placeCost(c.tower('range')), 50);
-    final t = s.placeTower('range', 0, 0)!;
+    final t = s.placeTower('range', 0, 1)!;
     expect(s.coins, 950);
     expect(s.upgradeCost(t), 38);
     expect(s.upgradeTower(t), isTrue);
@@ -272,18 +273,19 @@ void main() {
     expect(s.upgradeCost(t), isNull);
     expect(s.sellValue(t), ((50 + 38 + 63) * 0.7).floor());
     expect(s.placeTower('ripper', 1, 2), isNull, reason: 'ripper is front row only');
-    expect(s.placeTower('ripper', 1, 0), isNotNull);
+    expect(s.placeTower('ripper', 1, 0), isNull, reason: 'the front row is closed until Grounds Crew opens it');
+    expect(s.placeTower('ripper', 1, 1), isNotNull);
     s.teeOff();
     expect(s.placeCost(c.tower('range')), 50, reason: 'no extra cost during a wave');
-    expect(s.placeTower('range', 3, 3), isNotNull);
+    expect(s.placeTower('range', 5, 2), isNotNull);
   });
 
   test('tower targeting picks the enemy nearest the ball', () {
     final s = sim(c, coins: 1000)..teeOff();
     s.enemies.clear();
-    s.placeTower('range', 1, 0);
-    final far = s.spawnEnemy('goose', at: const V2(170, 380));
-    final close = s.spawnEnemy('goose', at: const V2(230, 420));
+    s.placeTower('range', 1, 1);
+    final far = s.spawnEnemy('goose', at: const V2(100, 470));
+    final close = s.spawnEnemy('goose', at: const V2(130, 500));
     far.abilityTimer = close.abilityTimer = 99;
     s.update(0.02);
     expect(close.hp, lessThan(close.maxHp));
@@ -294,6 +296,50 @@ void main() {
     expect(StoryLayout.golfer.y, greaterThan(StoryLayout.teeBox.bottom));
     expect(StoryLayout.teeBox.top, greaterThan(StoryLayout.fairway.bottom));
     expect(StoryLayout.golfer.y, lessThan(StoryLayout.clubBar.top));
+  });
+
+  test('the driver reaches the top of the screen at full power', () {
+    final s = sim(c, bag: ['driver_used', null, null])..teeOff();
+    final ball = s.release(0, 120).single;
+    expect(ball.distance, greaterThanOrEqualTo(StoryLayout.golfer.y - StoryLayout.fairway.top));
+  });
+
+  test('the build zone starts 6 wide by 2 deep; each Grounds Crew tier opens one front-row plot', () {
+    expect(StoryLayout.plotCount(0), 12);
+    expect(StoryLayout.teeBox.width, greaterThan(2 * StoryLayout.plotSize * 2), reason: 'wider than it is long');
+    for (var col = 0; col < StoryLayout.plotCols; col++) {
+      expect(StoryLayout.plotOpen(col, 0, 0), isFalse);
+      expect(StoryLayout.plotOpen(col, 1, 0), isTrue);
+      expect(StoryLayout.plotOpen(col, 2, 0), isTrue);
+    }
+    for (var extra = 1; extra <= 6; extra++) {
+      expect(StoryLayout.plotCount(extra), 12 + extra);
+      final open = [
+        for (var col = 0; col < 6; col++)
+          if (StoryLayout.plotOpen(col, 0, extra)) col,
+      ];
+      expect(open, hasLength(extra), reason: 'one more front-row plot per tier');
+    }
+    expect(StoryLayout.plotOpen(2, 0, 1), isTrue, reason: 'the first spot is in the middle of the front row');
+    final s = sim(c, coins: 1000);
+    expect(s.placeTower('range', 2, 0), isNull);
+    expect(s.frontRow(2), 1);
+    final up = sim(c, coins: 1000, hole: 9, extraPlots: 1);
+    expect(up.frontRow(2), 0);
+    expect(up.placeTower('ripper', 2, 1), isNull, reason: 'the opened plot is now the front of column 3');
+    expect(up.placeTower('ripper', 2, 0), isNotNull);
+    expect(up.placeTower('range', 3, 0), isNull, reason: 'only one plot opened');
+  });
+
+  test('enemies never spawn lower than a third of the way down the fairway', () {
+    for (var hole = 1; hole <= 9; hole++) {
+      final s = sim(c, hole: hole, round: 2)..teeOff();
+      for (var i = 0; i < 40; i++) {
+        final e = s.spawnEnemy(hole == 3 || hole == 9 ? 'gator' : 'goose');
+        expect(e.pos.y, lessThanOrEqualTo(StoryLayout.spawnMaxY + 1e-9), reason: 'hole $hole spawned at ${e.pos}');
+      }
+    }
+    expect(StoryLayout.spawnMaxY, closeTo(StoryLayout.fairway.top + StoryLayout.fairway.height / 3, 1e-9));
   });
 
   test('perks: coins now and tee health apply at Tee Off; tower cost -20% in Prep', () {
@@ -377,14 +423,14 @@ void main() {
   test('a full simulated hole 9 round 3 plays without errors', () {
     final s = sim(c, hole: 9, round: 3, coins: 2000, bag: ['driver_new', 'wedge_new', 'iron_new'], caddie: 'dottie');
     for (final (id, col, row) in [
-      ('range', 0, 0),
-      ('tesla', 1, 0),
-      ('sprinkler', 1, 1),
-      ('cannon', 2, 1),
-      ('ripper', 3, 0),
-      ('sniper', 0, 1),
-      ('snack_shack', 2, 2),
-      ('sand_trap', 2, 0),
+      ('range', 0, 1),
+      ('tesla', 1, 1),
+      ('sprinkler', 1, 2),
+      ('cannon', 2, 2),
+      ('ripper', 3, 1),
+      ('sniper', 0, 2),
+      ('snack_shack', 4, 2),
+      ('sand_trap', 2, 1),
     ]) {
       expect(s.placeTower(id, col, row), isNotNull, reason: id);
     }

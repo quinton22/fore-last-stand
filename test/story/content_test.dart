@@ -59,7 +59,7 @@ void main() {
         openEdges++;
         expect(flow.distanceCell(col, 0).isFinite, isTrue, reason: 'hole ${h.number} top col $col');
       }
-      for (var y = StoryLayout.spawnTop + 8; y < r.n('pathfinding.sideSpawnMaxY'); y += 15) {
+      for (var y = StoryLayout.spawnTop + 8; y < StoryLayout.spawnMaxY; y += 15) {
         for (final x in [8.0, StoryLayout.width - 8]) {
           final p = V2(x, y);
           if (!flow.blockedAt(p)) expect(flow.reachable(p), isTrue, reason: 'hole ${h.number} side $p');

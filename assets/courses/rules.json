@@ -177,6 +177,20 @@
         80,
         120
       ]
+    },
+    {
+      "id": "grounds",
+      "name": "Grounds Crew",
+      "description": "+1 tower spot in the front row",
+      "perTier": 1,
+      "costs": [
+        30,
+        60,
+        90,
+        120,
+        150,
+        180
+      ]
     }
   ],
   "perks": {
@@ -206,8 +220,7 @@
   "pathfinding": {
     "cell": 15,
     "sandCost": 1.4,
-    "obstacleMargin": 8,
-    "sideSpawnMaxY": 360
+    "obstacleMargin": 8
   },
   "hazards": {
     "sandSlow": 0.3

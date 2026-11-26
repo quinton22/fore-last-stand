@@ -127,13 +127,19 @@ class RoundGame extends FlameGame {
   }
 
   void _drawTeeBox(Canvas canvas) {
-    canvas.drawRRect(RRect.fromRectAndRadius(_r(StoryLayout.teeBox).inflate(4), const Radius.circular(10)), Paint()..color = const Color(0xFF66BB6A));
+    // The pad under every open plot: 6 x 2 to start, plus front-row plots from Grounds Crew.
+    final pad = Paint()..color = const Color(0xFF66BB6A);
+    for (var c = 0; c < StoryLayout.plotCols; c++) {
+      for (var r = 0; r < StoryLayout.plotRows; r++) {
+        if (sim.isPlotOpen(c, r)) canvas.drawRRect(RRect.fromRectAndRadius(_r(StoryLayout.plot(c, r)).inflate(3), const Radius.circular(8)), pad);
+      }
+    }
     // Sand Trap zones just above the tee box.
     for (final t in sim.towers) {
       if (t.spec.kind != TowerKind.sandTrap) continue;
-      final p = StoryLayout.plot(t.col, 0);
+      final p = StoryLayout.plot(t.col, sim.frontRow(t.col));
       final h = t.spec.stat('zoneHeight');
-      canvas.drawRect(Rect.fromLTRB(p.left + 2, StoryLayout.teeBox.top - h, p.right - 2, StoryLayout.teeBox.top), Paint()..color = const Color(0x88E6D29A));
+      canvas.drawRect(Rect.fromLTRB(p.left + 2, p.top - h, p.right - 2, p.top), Paint()..color = const Color(0x88E6D29A));
     }
     final line = Paint()
       ..style = PaintingStyle.stroke
@@ -141,6 +147,7 @@ class RoundGame extends FlameGame {
       ..color = const Color(0x66FFFFFF);
     for (var c = 0; c < StoryLayout.plotCols; c++) {
       for (var r = 0; r < StoryLayout.plotRows; r++) {
+        if (!sim.isPlotOpen(c, r)) continue;
         final rect = _r(StoryLayout.plot(c, r)).deflate(2);
         final rr = RRect.fromRectAndRadius(rect, const Radius.circular(6));
         if ((sim.disabledPlots[(c, r)] ?? 0) > 0) canvas.drawRRect(rr, Paint()..color = const Color(0xCC6D4C41));

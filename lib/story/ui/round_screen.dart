@@ -94,6 +94,7 @@ class _RoundScreenState extends State<RoundScreen> {
           caddieRank: caddie == null ? 1 : player.caddies[caddie] ?? 1,
           boost: run.bankedBoost,
           greenskeepingTier: cs.wingTier('greenskeeping'),
+          extraPlots: cs.wingTier('grounds'),
           aimAssist: settings.aimAssist,
           autoCaddie: settings.autoCaddie,
           reviveAvailable: canOfferReward(player, deps.ads),
@@ -302,7 +303,8 @@ class _RoundScreenState extends State<RoundScreen> {
     _pointer = e.pointer;
     _downAt = e.localPosition;
     _aimingNow = false;
-    _downPlot = StoryLayout.plotAt(V2(e.localPosition.dx, e.localPosition.dy));
+    final plot = StoryLayout.plotAt(V2(e.localPosition.dx, e.localPosition.dy));
+    _downPlot = plot != null && sim.isPlotOpen(plot.$1, plot.$2) ? plot : null;
     // Off the build zone, aiming starts at once (the Sweet Spot ring runs from touch down).
     if (sim.playing && _downPlot == null) _startAim();
   }
@@ -331,7 +333,8 @@ class _RoundScreenState extends State<RoundScreen> {
       sim.release(d.dx, d.dy);
       return;
     }
-    if (d.distance <= rules.n('swing.towerDragThreshold') && _downPlot != null && sim.canBuild) _openSheet(_downPlot!);
+    final plot = _downPlot;
+    if (d.distance <= rules.n('swing.towerDragThreshold') && plot != null && sim.canBuild && sim.isPlotOpen(plot.$1, plot.$2)) _openSheet(plot);
   }
 
   void _onCancel(PointerCancelEvent e) {
@@ -633,7 +636,7 @@ class _RoundScreenState extends State<RoundScreen> {
     for (final spec in content.towers)
       () {
         final unlocked = sim.isUnlocked(spec);
-        final rowOk = !spec.frontRowOnly || plot.$2 == 0;
+        final rowOk = !spec.frontRowOnly || plot.$2 == sim.frontRow(plot.$1);
         final cost = sim.placeCost(spec);
         final ok = unlocked && rowOk && sim.coins >= cost;
         return ListTile(

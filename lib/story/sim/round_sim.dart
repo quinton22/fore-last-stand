@@ -59,6 +59,7 @@ class RoundSetup {
     this.mode = RoundMode.story,
     this.modifier = DailyModifier.none,
     this.seed,
+    this.extraPlots = 0,
   });
 
   final StoryContent content;
@@ -89,6 +90,9 @@ class RoundSetup {
 
   /// Overrides the course/hole/round seed (arcade modes).
   final int? seed;
+
+  /// Front-row plots opened by Grounds Crew upgrades (0-6).
+  final int extraPlots;
 }
 
 /// Club stats after tier, level, perks and boosts.
@@ -306,6 +310,7 @@ class RoundSim {
     maxHealth = _baseMaxHealth;
     health = maxHealth;
     for (final t in setup.towers) {
+      if (!isPlotOpen(t.col, t.row)) continue; // saved on a plot that no longer exists
       final spec = content.tower(t.type);
       towers.add(_newTower(spec, t.col, t.row, t.level, nominalTowerValue(spec, t.level)));
     }
@@ -900,8 +905,19 @@ class RoundSim {
 
   bool isUnlocked(StoryTower spec) => setup.unlockedTowers.any((t) => t.id == spec.id);
 
+  /// The build zone starts 6 x 2; Grounds Crew upgrades open front-row plots.
+  bool isPlotOpen(int col, int row) => StoryLayout.plotOpen(col, row, setup.extraPlots);
+
+  /// The front-most open row of [col] (front-row-only towers go there).
+  int frontRow(int col) => StoryLayout.frontRow(col, setup.extraPlots);
+
   bool canPlace(StoryTower spec, int col, int row) =>
-      canBuild && isUnlocked(spec) && towerAt(col, row) == null && (!spec.frontRowOnly || row == 0) && coins >= placeCost(spec);
+      canBuild &&
+      isPlotOpen(col, row) &&
+      isUnlocked(spec) &&
+      towerAt(col, row) == null &&
+      (!spec.frontRowOnly || row == frontRow(col)) &&
+      coins >= placeCost(spec);
 
   double _levelMult(int level) => 1 + rules.n('towers.levelStrength') * (level - 1);
 
@@ -1024,12 +1040,12 @@ class RoundSim {
             _slow(e, math.min(0.6, s.stat('slow') * lvl), 0.6);
           }
         case TowerKind.sandTrap:
-          final box = StoryLayout.plot(t.col, 0);
-          final top = StoryLayout.teeBox.top - s.stat('zoneHeight');
+          final box = StoryLayout.plot(t.col, frontRow(t.col));
+          final top = box.top - s.stat('zoneHeight');
           final snare = (over ? 2 : 1) * s.stat('snare') * lvl;
           for (final e in enemies) {
             if (!e.targetable || e.flier || e.boss || e.snaredBy.contains(t.id)) continue;
-            if (e.pos.x < box.left || e.pos.x > box.right || e.pos.y < top || e.pos.y > StoryLayout.teeBox.top) continue;
+            if (e.pos.x < box.left || e.pos.x > box.right || e.pos.y < top || e.pos.y > box.top) continue;
             e.snaredBy.add(t.id);
             e.snareTimer = math.max(e.snareTimer, snare);
           }
@@ -1186,7 +1202,7 @@ class RoundSim {
   double get _hpScale => 1 + (endless ? rules.n('arcade.endlessHpPerWave') * (wave - 1) : rules.n('waves.hpPerHole') * (holeNumber - 1));
 
   V2 _edgePoint(double radius) {
-    final sideMax = rules.n('pathfinding.sideSpawnMaxY');
+    final sideMax = StoryLayout.spawnMaxY;
     for (var tries = 0; tries < 40; tries++) {
       final V2 p;
       if (rng.nextBool()) {
@@ -1217,7 +1233,8 @@ class RoundSim {
         default:
           p = V2(w.right + margin, w.top + rng.nextDouble() * w.height);
       }
-      if (p.x < radius || p.x > StoryLayout.width - radius || p.y < StoryLayout.spawnTop + radius || p.y > StoryLayout.fairway.bottom) continue;
+      // Gators surface only on the upper part of the fairway, like every spawn.
+      if (p.x < radius || p.x > StoryLayout.width - radius || p.y < StoryLayout.spawnTop + radius || p.y > StoryLayout.spawnMaxY) continue;
       if (!flow.blockedAt(p) && flow.reachable(p)) return p;
     }
     return null;
@@ -1383,7 +1400,7 @@ class RoundSim {
         final empty = [
           for (var c = 0; c < StoryLayout.plotCols; c++)
             for (var r = 0; r < StoryLayout.plotRows; r++)
-              if (towerAt(c, r) == null) (c, r),
+              if (isPlotOpen(c, r) && towerAt(c, r) == null) (c, r),
         ]..shuffle(rng);
         for (final p in [...occupied, ...empty].take(a.count)) {
           disabledPlots[p] = a.seconds;

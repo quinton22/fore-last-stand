@@ -69,6 +69,8 @@ RoundSetup arcadeSetup(StoryStore story, Settings settings, RoundMode mode, {req
     mode: mode,
     modifier: mode == RoundMode.daily ? dailyModifier(seed) : DailyModifier.none,
     seed: seed,
+    // Tower spots bought with Grounds Crew on the Story course apply here too.
+    extraPlots: cs.wingTier('grounds'),
   );
 }
 

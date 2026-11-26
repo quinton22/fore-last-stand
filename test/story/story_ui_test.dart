@@ -126,7 +126,7 @@ void main() {
     // Tapping a plot mid-round opens the build sheet and pauses the round.
     final box = tester.getRect(find.byType(GameWidget<RoundGame>));
     final scale = box.width / StoryLayout.width;
-    final plot = StoryLayout.plotCenter(0, 0);
+    final plot = StoryLayout.plotCenter(0, 1);
     await tester.tapAt(box.topLeft + Offset(plot.x * scale, plot.y * scale));
     await settle(tester);
     expect(find.text('Paused while you choose.'), findsOneWidget);

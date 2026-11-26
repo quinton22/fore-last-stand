@@ -13,11 +13,12 @@ Playable MVP of the [feature spec](https://claude.ai/code/artifact/f2b2c67e-0ef5
 - **Structure:** holes in order, 3 rounds each (3/4/5 timed waves, then a mini-boss in rounds 1-2 and a final boss in round 3). Coins, towers and perks carry between the rounds of a hole; a new hole starts with 150 coins and an empty build zone. Beating hole 9 shows Course Complete. Beaten holes can be replayed for half XP and tokens.
 - **Screens:** Main menu → course select (locked courses greyed) → hole map (Play, Bag, Pro Shop, Clubhouse, Caddies) → Prep (draft 1 of 3 perks, place towers, pick a caddie, optional ad boost, Tee Off) → round (8 s build breaks with Skip; pause: Resume, Settings, Concede, Main Menu) → Results.
 - **Saving:** a round is saved the moment it ends; Results then offers Continue (Next Round, Next Hole, Retry Round or Finish Course) or the Story Menu. Concede is only in the pause menu during a round: it voids the round and puts coins, towers and the perk pick back to Tee Off.
-- **Layout:** a 390 x 844 canvas, letterboxed: HUD, fairway with hazards (water, fences, sand, trees), the 4x4 build zone, then the golfer and ball near the bottom at (195, 768), then the club bar. Drag anywhere to aim (24-120 units maps to 35-100% power), shrinking Sweet Spot ring, per-club cooldowns, combo ladder, Fore! burst.
+- **Layout:** a 390 x 844 canvas, letterboxed: HUD, fairway with hazards (water, fences, sand, trees), the build zone, then the golfer and ball near the bottom at (195, 768), then the club bar. Enemies enter on the top edge or the upper third of the side edges. Club ranges are tuned so a full-power driver reaches the top of the fairway. Drag anywhere to aim (24-120 units maps to 35-100% power), shrinking Sweet Spot ring, per-club cooldowns, combo ladder, Fore! burst.
 - **Combat:** enemies follow a flow field around hazards toward the ball. Ground enemies stop to attack any tower in their way until it is destroyed; anything that reaches the ball stays there attacking it (bosses too). Towers have health: upgrading repairs them, a destroyed tower is lost. Losing all flags loses the round.
+- **Build zone:** 6 plots wide by 2 deep to start, in every mode. Each Grounds Crew tier in the Clubhouse opens one more plot in a third, front row (closest to the fairway), from the middle outward, up to 6; the arcade modes use the Story course's tier.
 - **Building:** towers cost the same in Prep, build breaks and mid-wave. Tapping a plot or a tower opens its sheet and pauses the round until it closes; dragging from a plot still aims.
 - **Per-course rank and clubs:** rank 1-18 from XP; each rank-up reveals one club in the Pro Shop, bought and levelled (1-5) with that course's Club Tokens. 3-slot bag, one club per family (Iron, Fairway Wood, Driver, Wedge, Putter), 18 clubs including 6 Specials.
-- **Content:** 8 enemies with abilities, 4 final bosses, 8 towers, 20 perks, Big Earl and Dottie with ranks paid in Caddie Badges, Clubhouse wings.
+- **Content:** 8 enemies with abilities, 4 final bosses, 8 towers, 20 perks, Big Earl and Dottie with ranks paid in Caddie Badges, Clubhouse wings (Snack Bar, Greenskeeping, Locker Room, Grounds Crew).
 - **Data:** everything is JSON in `assets/courses/`; the number of playable holes is the length of `holes.json`. The save is one JSON file written to a temp file and renamed.
 - **Rewarded ads:** revive and one boost per round. No ad SDK is wired up yet, so the buttons stay hidden; Settings → *Test ads* turns on a 3-second stand-in to try the flow.
 
@@ -49,7 +50,7 @@ All content is JSON: add a hole to `assets/courses/<courseId>/holes.json` and it
 - **Loop:** moment (2-10 s) → hole/wave (30-90 s) → round (3-15 min) → meta (clubs, caddies, clubhouse).
 - **Swing:** drag back to aim/power, release on the timing ring for a Sweet Spot (+50% damage); ~0.8 s cooldown; Fore! burst when the meter is full.
 - **Clubs:** Driver (pierce), Iron (bounces), Wedge (blast), Putter (ground roll).
-- **Towers:** on a 4x4 plot grid around the clubhouse (grows to 6x6); pairs unlock bonuses.
+- **Towers:** on a 6x2 build zone in front of the ball that grows a front row one plot at a time.
 - **Modes:** Story Mode, Sudden Death, Daily Tournament, Weekly Invitational.
 - **Meta:** club/tower levels, caddies, clubhouse wings, bestiary, Tour Rank prestige.
 - **Monetization:** F2P, opt-in rewarded ads, cosmetic-first IAP, no interstitials during a run.

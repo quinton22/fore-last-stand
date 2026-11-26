@@ -269,6 +269,11 @@ void main() {
       buyWing(c.rules, cs, 'greenskeeping');
     }
     expect(cs.wingTier('greenskeeping'), 3);
+    cs.tokens = 10000;
+    for (var i = 0; i < 10; i++) {
+      buyWing(c.rules, cs, 'grounds');
+    }
+    expect(cs.wingTier('grounds'), 6, reason: 'Grounds Crew opens the 6 front-row plots one at a time');
   });
 
   test('perk offers are seeded and never repeat a perk on the hole', () {

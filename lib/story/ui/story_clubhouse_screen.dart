@@ -23,7 +23,9 @@ class StoryClubhouseScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(12),
             children: [
-              Text('Upgrades belong to ${store.content.course(courseId).name}. The tee box stays 4x4.'),
+              Text(
+                'Upgrades belong to ${store.content.course(courseId).name}. The build zone starts at 6x2; Grounds Crew opens one front-row spot per tier, and those spots also apply in the arcade modes.',
+              ),
               const SizedBox(height: 8),
               for (final w in rules.clubhouse)
                 () {
