@@ -1,19 +1,35 @@
 import 'dart:math' as math;
 
-import '../../sim/entities.dart' show Fx, FxKind;
 import '../../sim/swing_math.dart' show assistAim;
 import '../../sim/vec.dart';
 import '../content.dart';
 import '../progression.dart';
 import '../save.dart';
 import 'flow_field.dart';
+import 'fx.dart';
 import 'layout.dart';
 import 'story_waves.dart';
 
-/// One Story Mode round (6a): Prep, then waves with build breaks, then a boss.
+/// One round on the Story engine (6a): Prep, then waves with build breaks,
+/// then a boss. The arcade modes and the Driving Range run on the same engine.
 /// Pure Dart, so the Flame layer only draws it and forwards input.
 
 enum RoundPhase { prep, wave, buildBreak, revive, won, lost }
+
+/// Story round, Sudden Death (endless, one flag), Daily Tournament, or the Driving Range.
+enum RoundMode { story, endless, daily, range }
+
+/// Daily Tournament twists.
+enum DailyModifier { none, windy, bigBalls, stampede, cheapSeats, glassTee }
+
+const Map<DailyModifier, String> modifierNames = {
+  DailyModifier.none: 'None',
+  DailyModifier.windy: 'Windy: balls drift sideways',
+  DailyModifier.bigBalls: 'Big Balls: balls are 60% bigger',
+  DailyModifier.stampede: 'Stampede: enemies move 25% faster',
+  DailyModifier.cheapSeats: 'Cheap Seats: towers cost 25% less',
+  DailyModifier.glassTee: 'Glass Tee: 40% less health, 50% more coins',
+};
 
 class BagClub {
   const BagClub(this.club, this.level);
@@ -38,7 +54,11 @@ class RoundSetup {
     this.boost,
     this.greenskeepingTier = 0,
     this.aimAssist = 0,
+    this.autoCaddie = false,
     this.reviveAvailable = false,
+    this.mode = RoundMode.story,
+    this.modifier = DailyModifier.none,
+    this.seed,
   });
 
   final StoryContent content;
@@ -59,8 +79,16 @@ class RoundSetup {
   final int greenskeepingTier;
   final double aimAssist;
 
+  /// Swings for the player at reduced damage (accessibility setting).
+  final bool autoCaddie;
+
   /// Whether a revive (rewarded ad or Remove Ads) can be offered.
   final bool reviveAvailable;
+  final RoundMode mode;
+  final DailyModifier modifier;
+
+  /// Overrides the course/hole/round seed (arcade modes).
+  final int? seed;
 }
 
 /// Club stats after tier, level, perks and boosts.
@@ -113,18 +141,21 @@ class SEnemy {
   double hp;
   final double radius;
   final double speed;
+
+  /// Damage per attack on a tower or the ball.
   final double damage;
   final int coins;
 
-  /// Mini-boss or final boss: immune to knockback, retreats after hitting the tee box.
+  /// Mini-boss or final boss: immune to knockback.
   final bool boss;
 
-  /// Set for the round 3 final boss.
+  /// Set for a final boss.
   final StoryBoss? bossSpec;
   final SEnemy? leader;
   bool removed = false;
 
   double abilityTimer = 0;
+  double attackTimer = 0;
   double slowTimer = 0;
   double slowAmount = 0;
   double wetTimer = 0;
@@ -141,9 +172,14 @@ class SEnemy {
   final Set<int> snaredBy = {};
 
   int stolen = 0;
-  bool fleeing = false;
-  bool retreating = false;
   bool dived = false;
+  bool gassed = false;
+
+  /// The tower being attacked, or null.
+  STower? attacking;
+
+  /// True while standing at the ball attacking it.
+  bool atBall = false;
 
   double pauseTimer = 0;
   double chargeCooldown = 0;
@@ -154,6 +190,7 @@ class SEnemy {
   bool get finalBoss => bossSpec != null;
   bool get submerged => submergeTimer > 0;
   bool get targetable => alive && !submerged;
+  bool get stationary => spec.target || speed <= 0;
   String get abilityType => spec.ability?.type ?? '';
   String get name => bossSpec?.name ?? (boss ? 'Giant ${spec.name}' : spec.name);
 }
@@ -167,6 +204,7 @@ class SBall {
     required this.pierce,
     required this.bounces,
     required this.distance,
+    required this.radius,
     this.sweet = false,
     this.free = false,
   });
@@ -180,11 +218,11 @@ class SBall {
 
   /// Units of travel left before the ball lands.
   double distance;
+  final double radius;
   final bool sweet;
 
   /// Fore! burst balls never break the combo or charge the meter.
   final bool free;
-  final double radius = 5;
   bool done = false;
   bool hitSomething = false;
   final Set<int> hitIds = {};
@@ -197,19 +235,18 @@ class SBall {
   bool get isLob => lobTarget != null;
   bool get rolls => stats.motion == BallMotion.roll;
 
-  /// 0..1 height for drawing lobs and iron arcs.
+  /// 0..1 height for drawing lobs.
   double get height {
-    if (isLob) {
-      final p = lobTotal == 0 ? 1.0 : (lobTime / lobTotal).clamp(0.0, 1.0);
-      return 4 * p * (1 - p);
-    }
-    return 0;
+    if (!isLob) return 0;
+    final p = lobTotal == 0 ? 1.0 : (lobTime / lobTotal).clamp(0.0, 1.0);
+    return 4 * p * (1 - p);
   }
 }
 
 class STower {
-  STower({required this.id, required this.spec, required this.col, required this.row, required this.level, required this.invested})
-    : pos = StoryLayout.plotCenter(col, row);
+  STower({required this.id, required this.spec, required this.col, required this.row, required this.level, required this.invested, required this.maxHp})
+    : pos = StoryLayout.plotCenter(col, row),
+      hp = maxHp;
 
   final int id;
   final StoryTower spec;
@@ -218,6 +255,8 @@ class STower {
   final V2 pos;
   int level;
   int invested;
+  double maxHp;
+  double hp;
   double cooldown = 0;
   double stun = 0;
   double disabled = 0;
@@ -225,8 +264,10 @@ class STower {
   bool gassed = false;
   bool plotDisabled = false;
   double spin = 0;
+  double hitFlash = 0;
 
-  bool get active => stun <= 0 && disabled <= 0 && !gassed && !plotDisabled;
+  bool get destroyed => hp <= 0;
+  bool get active => !destroyed && stun <= 0 && disabled <= 0 && !gassed && !plotDisabled;
   bool get overcharged => overcharge > 0;
 }
 
@@ -248,7 +289,7 @@ class SGas {
 class RoundSim {
   RoundSim(this.setup)
     : rules = setup.content.rules,
-      rng = math.Random(roundSeed(setup.courseId, setup.hole.number, setup.round, 'sim')),
+      rng = math.Random(setup.seed ?? roundSeed(setup.courseId, setup.hole.number, setup.round, 'sim')),
       coins = setup.coins,
       perks = List.of(setup.perks),
       roundPerk = setup.roundPerk,
@@ -261,12 +302,12 @@ class RoundSim {
       margin: rules.n('pathfinding.obstacleMargin'),
       sandCost: rules.n('pathfinding.sandCost'),
     );
-    flags = rules.i('teeBox.flags');
+    flags = mode == RoundMode.endless ? 1 : rules.i('teeBox.flags');
     maxHealth = _baseMaxHealth;
     health = maxHealth;
     for (final t in setup.towers) {
       final spec = content.tower(t.type);
-      towers.add(STower(id: _nextId++, spec: spec, col: t.col, row: t.row, level: t.level, invested: nominalTowerValue(spec, t.level)));
+      towers.add(_newTower(spec, t.col, t.row, t.level, nominalTowerValue(spec, t.level)));
     }
     setBag(setup.bag);
   }
@@ -281,6 +322,9 @@ class RoundSim {
   int get holeNumber => hole.number;
   int get round => setup.round;
   Hazards get hazards => hole.hazards;
+  RoundMode get mode => setup.mode;
+  DailyModifier get modifier => setup.modifier;
+  int get _seed => setup.seed ?? roundSeed(setup.courseId, holeNumber, round);
 
   RoundPhase phase = RoundPhase.prep;
   RoundPhase _phaseBeforeRevive = RoundPhase.wave;
@@ -296,6 +340,7 @@ class RoundSim {
   int flagsLost = 0;
   late double maxHealth;
   late double health;
+  double _grace = 0;
 
   /// Current wave, 1-based (0 during Prep).
   int wave = 0;
@@ -304,6 +349,9 @@ class RoundSim {
   bool _bossPending = false;
   double _spawnTimer = 0;
   double breakTimer = 0;
+
+  /// Sudden Death: a perk draft is due at this build break.
+  bool draftDue = false;
 
   final List<SEnemy> enemies = [];
   final List<SBall> balls = [];
@@ -315,7 +363,7 @@ class RoundSim {
   /// Plots disabled by a boss: (col, row) -> seconds left.
   final Map<(int, int), double> disabledPlots = {};
 
-  /// The 3 bag slots; changeable at Prep only.
+  /// The 3 bag slots (5 on the range); changeable at Prep only.
   List<BagClub?> bag = const [];
   late List<double> cooldowns;
   late int selectedSlot;
@@ -330,7 +378,6 @@ class RoundSim {
   double _foreTimer = 0;
   bool caddieUsed = false;
   bool reviveUsed = false;
-  double slowMo = 0;
   double shake = 0;
   double time = 0;
 
@@ -341,6 +388,16 @@ class RoundSim {
   final Map<String, int> killsById = {};
   double _pinTimer = 0;
   int _nextId = 0;
+
+  // Stats (score, Driving Range lessons).
+  int swings = 0;
+  int sweetSwings = 0;
+  int foreBursts = 0;
+  int overcharges = 0;
+  int towersBuilt = 0;
+  final Set<String> familiesSwung = {};
+  double damageDealt = 0;
+  double lastHit = 0;
 
   // ---------------------------------------------------------------- perks
 
@@ -371,6 +428,18 @@ class RoundSim {
     perks.add(id);
   }
 
+  /// Adds a perk mid-run (Sudden Death drafts, Driving Range tools).
+  void addPerk(String id) {
+    perks.add(id);
+    final p = content.perk(id);
+    if (phase == RoundPhase.prep) return;
+    if (p.effect == 'coinsNow') coins += p.value.round();
+    if (p.effect == 'teeHealth') {
+      maxHealth += p.value;
+      health += p.value;
+    }
+  }
+
   StoryCaddie? get caddie => caddieId == null ? null : content.caddie(caddieId!);
   double get _caddieScale => caddieScale(rules, caddieRank);
   double caddiePassive(String type) {
@@ -383,22 +452,37 @@ class RoundSim {
   bool get finished => phase == RoundPhase.won || phase == RoundPhase.lost;
   bool get live => phase == RoundPhase.wave;
   bool get playing => phase == RoundPhase.wave || phase == RoundPhase.buildBreak;
-  int get normalWaves => rules.rounds[round - 1].waves;
-  int get totalWaveCount => normalWaves + 1;
-  bool get isBossWave => wave == totalWaveCount;
-  bool get finalBossRound => rules.rounds[round - 1].finalBoss;
+  bool get endless => mode == RoundMode.endless;
+  bool get range => mode == RoundMode.range;
+
+  /// Normal waves before the boss wave (null in Sudden Death).
+  int? get normalWaves => endless || range ? null : rules.rounds[round - 1].waves;
+  int? get totalWaveCount => normalWaves == null ? null : normalWaves! + 1;
+  bool get isBossWave => endless ? wave > 0 && wave % rules.i('arcade.endlessMiniEvery') == 0 : wave == totalWaveCount;
+  bool get finalBossRound => endless ? wave % rules.i('arcade.endlessBossEvery') == 0 : rules.rounds[round - 1].finalBoss;
+
+  /// Hole-equivalent difficulty for enemy health and boss scaling.
+  int get difficulty => endless ? endlessHole(math.max(1, wave)) : holeNumber;
   double get maxFore => rules.n('fore.max');
   bool get foreReady => foreMeter >= maxFore && playing && _foreBallsLeft == 0;
   bool get caddieReady => caddie != null && !caddieUsed && playing;
   int get comboCount => rules.comboNames.length;
   String get comboName => rules.comboNames[comboRung];
   double get comboMultiplier => rules.comboMultipliers[comboRung];
-  double get _baseMaxHealth => rules.n('teeBox.health') + rules.wing('greenskeeping').perTier * setup.greenskeepingTier;
+  double get _baseMaxHealth {
+    final h = rules.n('teeBox.health') + rules.wing('greenskeeping').perTier * setup.greenskeepingTier;
+    return modifier == DailyModifier.glassTee ? h * 0.6 : h;
+  }
+
+  double get ballRadius => modifier == DailyModifier.bigBalls ? 8 : 5;
 
   /// Enemies still to come in this wave, plus those on the course.
   int get enemiesLeft => _spawnQueue.length + (_bossPending ? 1 : 0) + enemies.where((e) => e.alive).length;
 
   List<StoryTower> get unlockedTowers => setup.unlockedTowers;
+
+  /// Arcade score.
+  int get score => kills * 10 + wavesCleared * 100 + flags * 200 + (phase == RoundPhase.won ? 500 : 0);
 
   // ---------------------------------------------------------------- clubs
 
@@ -471,9 +555,11 @@ class RoundSim {
 
   void cancelAim() => aiming = false;
 
+  bool _hittable(ClubStats s, SEnemy e) => e.targetable && (s.hitsFliers || !e.flier);
+
   V2 _assisted(V2 dir, ClubStats s) {
     if (setup.aimAssist <= 0) return dir;
-    final target = _nearest(StoryLayout.golfer, (e) => e.targetable && (s.hitsFliers || !e.flier));
+    final target = _nearest(StoryLayout.golfer, (e) => _hittable(s, e));
     return target == null ? dir : assistAim(dir, target.pos - StoryLayout.golfer, setup.aimAssist);
   }
 
@@ -487,15 +573,25 @@ class RoundSim {
     final len = math.sqrt(dx * dx + dy * dy);
     final power = powerFor(len);
     if (power == null) return const [];
+    return _swing(b, V2(-dx / len, -dy / len), power, sweet: sweet);
+  }
+
+  List<SBall> _swing(BagClub b, V2 rawDir, double power, {required bool sweet, bool auto = false}) {
     final s = statsFor(b);
-    final dir = _assisted(V2(-dx / len, -dy / len), s);
+    final dir = auto ? rawDir : _assisted(rawDir, s);
     cooldowns[selectedSlot] = s.cooldown;
     var damage = s.damage;
+    if (!auto) {
+      swings++;
+      familiesSwung.add(s.family.id);
+    }
     if (sweet) {
+      sweetSwings++;
       damage *= 1 + rules.n('swing.sweetDamage') + perkSum('sweetDamage');
       shake = 0.2;
       fx.add(Fx(FxKind.sweet, [StoryLayout.golfer], ttl: 0.35, radius: 30, colorValue: 0xFF76FF03));
     }
+    if (auto) damage *= 0.6;
     final e = s.effect;
     if (e != null && e.type == 'twin') {
       final out = <SBall>[];
@@ -518,6 +614,7 @@ class RoundSim {
       pierce: s.pierce + (sweet ? rules.i('swing.sweetPierce') : 0),
       bounces: s.bounces,
       distance: s.range * power,
+      radius: ballRadius,
       sweet: sweet,
       free: free,
     );
@@ -532,7 +629,7 @@ class RoundSim {
 
   V2 lobTargetFor(V2 dir, double power, ClubStats s) {
     final p = StoryLayout.golfer + dir * (s.range * power);
-    return V2(p.x.clamp(0, StoryLayout.width).toDouble(), p.y.clamp(StoryLayout.fairway.top, StoryLayout.fairway.bottom).toDouble());
+    return V2(p.x.clamp(0, StoryLayout.width).toDouble(), p.y.clamp(StoryLayout.fairway.top, StoryLayout.golfer.y - 30).toDouble());
   }
 
   /// Dotted preview for a drag: the first leg and one wall bounce, or the lob landing.
@@ -572,11 +669,23 @@ class RoundSim {
     return points;
   }
 
+  void _autoSwing() {
+    final b = selectedClub;
+    if (b == null || cooldowns[selectedSlot] > 0) return;
+    final s = statsFor(b);
+    final target = _nearest(StoryLayout.golfer, (e) => _hittable(s, e), range: s.range);
+    if (target == null) return;
+    final to = target.pos - StoryLayout.golfer;
+    final power = (to.length / s.range).clamp(rules.n('swing.minPower'), 1.0).toDouble();
+    _swing(b, to.normalized(), power, sweet: false, auto: true);
+  }
+
   // ---------------------------------------------------------------- Fore! and caddie
 
   bool triggerFore() {
     if (!foreReady || selectedClub == null) return false;
     foreMeter = 0;
+    foreBursts++;
     _foreBallsTotal = rules.i('fore.balls') + perkSum('foreBalls').round();
     _foreBallsLeft = _foreBallsTotal;
     _foreTimer = 0;
@@ -613,7 +722,7 @@ class RoundSim {
   bool useCaddie() {
     final c = caddie;
     if (c == null || !caddieReady) return false;
-    caddieUsed = true;
+    caddieUsed = !range;
     switch (c.active) {
       case 'foreMeter':
         foreMeter = math.min(maxFore, foreMeter + c.activeValue * _caddieScale);
@@ -645,6 +754,11 @@ class RoundSim {
     maxHealth = _baseMaxHealth + perkSum('teeHealth');
     health = maxHealth;
     _pinTimer = rules.n('overcharge.flagMinGap');
+    if (range) {
+      phase = RoundPhase.wave;
+      wave = 1;
+      return;
+    }
     _startWave(1);
   }
 
@@ -652,15 +766,28 @@ class RoundSim {
     wave = n;
     _spawnQueue.clear();
     _bossPending = false;
-    if (n <= normalWaves) {
-      _spawnQueue.addAll(waveRoster(content, setup.courseId, hole: holeNumber, round: round, wave: n, flagsLost: flagsLost));
-      _say('Wave $n of $normalWaves');
+    draftDue = false;
+    if (!isBossWave) {
+      _spawnQueue.addAll(
+        endless
+            ? endlessRoster(content, _seed, wave: n, flagsLost: flagsLost)
+            : waveRoster(content, setup.courseId, hole: holeNumber, round: round, wave: n, flagsLost: flagsLost),
+      );
+      _say(endless ? 'Wave $n' : 'Wave $n of $normalWaves');
     } else {
       _bossPending = true;
-      _say(finalBossRound ? content.bossForHole(holeNumber).name : 'Mini-boss: Giant ${content.enemy(hole.featured).name}');
+      _say(finalBossRound ? _finalBoss.name : 'Mini-boss: Giant ${content.enemy(_featured).name}');
     }
     _spawnTimer = 0;
     phase = RoundPhase.wave;
+  }
+
+  String get _featured => endless ? newestEnemy(content, wave).id : hole.featured;
+
+  StoryBoss get _finalBoss {
+    if (!endless) return content.bossForHole(holeNumber);
+    final n = wave ~/ rules.i('arcade.endlessBossEvery');
+    return content.bosses[(n - 1) % content.bosses.length];
   }
 
   void skipBreak() {
@@ -670,7 +797,7 @@ class RoundSim {
   void _waveCleared() {
     wavesCleared++;
     pins.clear();
-    if (wave >= totalWaveCount) {
+    if (!endless && wave >= totalWaveCount!) {
       phase = RoundPhase.won;
       _say(finalBossRound ? 'Hole ${hole.number} beaten!' : 'Round won!');
       return;
@@ -679,6 +806,7 @@ class RoundSim {
     if (heal > 0) health = math.min(maxHealth, health + heal);
     breakTimer = rules.n('waves.buildBreak');
     phase = RoundPhase.buildBreak;
+    if (endless && wave % rules.i('arcade.endlessDraftEvery') == 0) draftDue = true;
   }
 
   void acceptRevive() {
@@ -686,13 +814,16 @@ class RoundSim {
     reviveUsed = true;
     flags = 1;
     health = maxHealth;
+    _grace = rules.n('teeBox.flagGrace');
     final clear = rules.n('ads.reviveClearRadius');
     for (final e in enemies) {
       if (!e.alive) continue;
       if (e.boss) {
         e.pos = V2(e.pos.x, StoryLayout.fairway.top + e.radius + 4);
-        e.retreating = false;
-      } else if (StoryLayout.distanceToTeeBox(e.pos) <= clear) {
+        e.atBall = false;
+        e.attacking = null;
+        e.chargeDir = null;
+      } else if (e.pos.distanceTo(StoryLayout.golfer) <= clear || StoryLayout.distanceToTeeBox(e.pos) <= clear / 3) {
         e.removed = true;
         fx.add(Fx(FxKind.gib, [e.pos], ttl: 0.5, radius: e.radius, colorValue: e.spec.color));
       }
@@ -706,17 +837,26 @@ class RoundSim {
     if (phase == RoundPhase.revive) phase = RoundPhase.lost;
   }
 
+  /// Ends an arcade run early (counts as lost).
+  void endRun() {
+    if (!finished) phase = RoundPhase.lost;
+  }
+
   RoundOutcome outcome() => RoundOutcome(
     won: phase == RoundPhase.won,
     wavesCleared: wavesCleared,
-    totalWaves: totalWaveCount,
+    totalWaves: totalWaveCount ?? wave,
     flagsLeft: flags,
     endCoins: coins,
     endTowers: snapshotTowers(),
     kills: Map.of(killsById),
   );
 
-  List<PlacedTower> snapshotTowers() => [for (final t in towers) PlacedTower(type: t.spec.id, col: t.col, row: t.row, level: t.level)];
+  /// Towers still standing, at full health for the next round.
+  List<PlacedTower> snapshotTowers() => [
+    for (final t in towers)
+      if (!t.destroyed) PlacedTower(type: t.spec.id, col: t.col, row: t.row, level: t.level),
+  ];
 
   void _say(String text) {
     banner = text;
@@ -726,7 +866,7 @@ class RoundSim {
   // ---------------------------------------------------------------- towers
 
   bool get canBuild => phase == RoundPhase.prep || playing;
-  double get _costMultiplier => (1 - perkSum('towerCost')).clamp(0.2, 1.0) * (live ? rules.n('coins.liveCostMultiplier') : 1);
+  double get _costMultiplier => (1 - perkSum('towerCost')).clamp(0.2, 1.0) * (modifier == DailyModifier.cheapSeats ? 0.75 : 1);
 
   /// Coins a tower is worth at [level] at normal prices (no discounts).
   int nominalTowerValue(StoryTower spec, int level) {
@@ -739,6 +879,8 @@ class RoundSim {
   }
 
   int get maxTowerLevel => rules.list('towers.levelCosts').length + 1;
+
+  /// Building costs the same in Prep, build breaks and during a wave.
   int placeCost(StoryTower spec) => (spec.cost * _costMultiplier).round();
 
   int? upgradeCost(STower t) {
@@ -751,7 +893,7 @@ class RoundSim {
 
   STower? towerAt(int col, int row) {
     for (final t in towers) {
-      if (t.col == col && t.row == row) return t;
+      if (t.col == col && t.row == row && !t.destroyed) return t;
     }
     return null;
   }
@@ -761,36 +903,55 @@ class RoundSim {
   bool canPlace(StoryTower spec, int col, int row) =>
       canBuild && isUnlocked(spec) && towerAt(col, row) == null && (!spec.frontRowOnly || row == 0) && coins >= placeCost(spec);
 
+  double _levelMult(int level) => 1 + rules.n('towers.levelStrength') * (level - 1);
+
+  STower _newTower(StoryTower spec, int col, int row, int level, int invested) =>
+      STower(id: _nextId++, spec: spec, col: col, row: row, level: level, invested: invested, maxHp: spec.health * _levelMult(level));
+
   STower? placeTower(String id, int col, int row) {
     final spec = content.tower(id);
     if (!canPlace(spec, col, row)) return null;
     final cost = placeCost(spec);
     coins -= cost;
-    final t = STower(id: _nextId++, spec: spec, col: col, row: row, level: 1, invested: cost);
+    final t = _newTower(spec, col, row, 1, cost);
     towers.add(t);
-    if (live) slowMo = rules.n('coins.slowMoSeconds');
+    towersBuilt++;
     return t;
   }
 
+  /// Upgrading also repairs the tower to its new full health.
   bool upgradeTower(STower t) {
     final cost = upgradeCost(t);
-    if (!canBuild || cost == null || coins < cost) return false;
+    if (!canBuild || cost == null || coins < cost || t.destroyed) return false;
     coins -= cost;
     t.invested += cost;
     t.level++;
-    if (live) slowMo = rules.n('coins.slowMoSeconds');
+    t.maxHp = t.spec.health * _levelMult(t.level);
+    t.hp = t.maxHp;
     return true;
   }
 
   int sellTower(STower t) {
-    if (!canBuild || !towers.contains(t)) return 0;
+    if (!canBuild || !towers.contains(t) || t.destroyed) return 0;
     final v = sellValue(t);
     coins += v;
     towers.remove(t);
     return v;
   }
 
-  double _levelMult(STower t) => 1 + rules.n('towers.levelStrength') * (t.level - 1);
+  void damageTower(STower t, double amount) {
+    if (t.destroyed) return;
+    t.hp -= amount;
+    t.hitFlash = 0.1;
+    if (t.hp > 0) return;
+    t.hp = 0;
+    fx.add(Fx(FxKind.explosion, [t.pos], ttl: 0.5, radius: 34, colorValue: t.spec.color));
+    fx.add(Fx(FxKind.text, [t.pos], ttl: 1, text: 'Destroyed!', colorValue: 0xFFFF5252));
+    for (final e in enemies) {
+      if (e.attacking == t) e.attacking = null;
+    }
+  }
+
   double towerRange(STower t, double base) => base * (1 + perkSum('towerRange'));
 
   /// Range ring for the renderer (0 = no ring).
@@ -800,22 +961,24 @@ class RoundSim {
     _ => 0,
   };
 
+  bool _adjacent(STower a, STower b) => (a.col - b.col).abs() + (a.row - b.row).abs() == 1;
+
   double _rateMult(STower t) {
     var m = 1.0;
     for (final o in towers) {
-      if (o.spec.kind != TowerKind.snackShack || !o.active || o == t) continue;
-      if ((o.col - t.col).abs() + (o.row - t.row).abs() == 1) m += o.spec.stat('adjacentRate') * _levelMult(o);
+      if (o.spec.kind != TowerKind.snackShack || !o.active || o == t || !_adjacent(o, t)) continue;
+      m += o.spec.stat('adjacentRate') * _levelMult(o.level);
     }
     return m;
   }
 
-  /// The targetable enemy nearest the tee box within [range] of [from].
-  SEnemy? _nearestTee(V2 from, double range, {bool fliers = true}) {
+  /// The targetable enemy nearest the ball within [range] of [from].
+  SEnemy? _nearestBall(V2 from, double range, {bool fliers = true}) {
     SEnemy? best;
     var bestD = double.infinity;
     for (final e in enemies) {
       if (!e.targetable || (!fliers && e.flier) || e.pos.distanceTo(from) > range) continue;
-      final d = StoryLayout.teeLine - e.pos.y;
+      final d = e.pos.distanceTo(StoryLayout.golfer);
       if (d < bestD) {
         bestD = d;
         best = e;
@@ -830,10 +993,11 @@ class RoundSim {
       t.stun = math.max(0, t.stun - dt);
       t.disabled = math.max(0, t.disabled - dt);
       t.overcharge = math.max(0, t.overcharge - dt);
+      t.hitFlash = math.max(0, t.hitFlash - dt);
       t.gassed = gas.any((g) => g.pos.distanceTo(t.pos) < g.radius);
       t.plotDisabled = (disabledPlots[(t.col, t.row)] ?? 0) > 0;
       if (!t.active || phase != RoundPhase.wave) continue;
-      final lvl = _levelMult(t);
+      final lvl = _levelMult(t.level);
       final over = t.overcharged;
       final s = t.spec;
       var rate = _rateMult(t);
@@ -842,7 +1006,7 @@ class RoundSim {
       switch (s.kind) {
         case TowerKind.ballMachine:
           if (t.cooldown > 0) break;
-          final e = _nearestTee(t.pos, towerRange(t, s.stat('range')));
+          final e = _nearestBall(t.pos, towerRange(t, s.stat('range')));
           if (e == null) break;
           t.cooldown = s.stat('interval');
           fx.add(Fx(FxKind.tracer, [t.pos, e.pos], ttl: 0.08, colorValue: 0xFFFFFFFF));
@@ -861,17 +1025,17 @@ class RoundSim {
           }
         case TowerKind.sandTrap:
           final box = StoryLayout.plot(t.col, 0);
-          final top = StoryLayout.teeLine - s.stat('zoneHeight');
+          final top = StoryLayout.teeBox.top - s.stat('zoneHeight');
           final snare = (over ? 2 : 1) * s.stat('snare') * lvl;
           for (final e in enemies) {
             if (!e.targetable || e.flier || e.boss || e.snaredBy.contains(t.id)) continue;
-            if (e.pos.x < box.left || e.pos.x > box.right || e.pos.y < top || e.pos.y > StoryLayout.teeLine) continue;
+            if (e.pos.x < box.left || e.pos.x > box.right || e.pos.y < top || e.pos.y > StoryLayout.teeBox.top) continue;
             e.snaredBy.add(t.id);
             e.snareTimer = math.max(e.snareTimer, snare);
           }
         case TowerKind.cartCannon:
           if (t.cooldown > 0) break;
-          final e = _nearestTee(t.pos, towerRange(t, s.stat('range')), fliers: false);
+          final e = _nearestBall(t.pos, towerRange(t, s.stat('range')), fliers: false);
           if (e == null) break;
           t.cooldown = s.stat('interval');
           final at = e.pos;
@@ -882,7 +1046,7 @@ class RoundSim {
           }
         case TowerKind.teeTesla:
           if (t.cooldown > 0) break;
-          final first = _nearestTee(t.pos, towerRange(t, s.stat('range')));
+          final first = _nearestBall(t.pos, towerRange(t, s.stat('range')));
           if (first == null) break;
           t.cooldown = s.stat('interval');
           final jumps = (over ? s.stat('overchargeChains') : s.stat('chains')).round();
@@ -906,7 +1070,7 @@ class RoundSim {
           for (final e in List.of(enemies)) {
             if (!e.targetable || e.flier) continue;
             if (e.pos.x < box.left - e.radius || e.pos.x > box.right + e.radius) continue;
-            if (e.pos.y < StoryLayout.teeLine - reach - e.radius) continue;
+            if (e.pos.y < box.top - reach - e.radius || e.pos.y > box.bottom + e.radius) continue;
             damageEnemy(e, dps * dt, quiet: true);
             e.hitFlash = 0.05;
           }
@@ -920,19 +1084,23 @@ class RoundSim {
           }
           if (best == null) break;
           t.cooldown = s.stat('interval');
-          if (over) {
-            best.sniperMarkTimer = s.stat('markSeconds');
-          }
+          if (over) best.sniperMarkTimer = s.stat('markSeconds');
           fx.add(Fx(FxKind.tracer, [t.pos, best.pos], ttl: 0.15, colorValue: 0xFFA5D6A7));
           damageEnemy(best, s.stat('damage') * lvl * dmgPerk);
         case TowerKind.snackShack:
-          health = math.min(maxHealth, health + s.stat('heal') * lvl * dt);
+          final heal = s.stat('heal') * lvl * dt;
+          health = math.min(maxHealth, health + heal);
+          for (final o in towers) {
+            if (o != t && !o.destroyed && _adjacent(o, t)) o.hp = math.min(o.maxHp, o.hp + heal);
+          }
       }
     }
+    towers.removeWhere((t) => t.destroyed);
   }
 
   void _overchargeAll() {
     final seconds = rules.n('overcharge.seconds') + perkSum('overchargeSeconds');
+    overcharges++;
     for (final t in towers) {
       t.overcharge = math.max(t.overcharge, seconds);
       if (t.spec.kind == TowerKind.cartCannon) t.cooldown = 0;
@@ -953,7 +1121,7 @@ class RoundSim {
     _pinTimer = minGap + rng.nextDouble() * (maxGap - minGap);
     if (pins.isNotEmpty || towers.isEmpty) return;
     for (var tries = 0; tries < 20; tries++) {
-      final p = V2(40 + rng.nextDouble() * (StoryLayout.width - 80), 140 + rng.nextDouble() * 320);
+      final p = V2(40 + rng.nextDouble() * (StoryLayout.width - 80), 140 + rng.nextDouble() * 300);
       if (FlowField.isObstacle(hazards, p, 12) || hazards.sand.any((s) => s.contains(p))) continue;
       pins.add(SPin(p, rules.n('overcharge.flagLifetime')));
       return;
@@ -972,12 +1140,19 @@ class RoundSim {
     return false;
   }
 
+  /// Puts a flag on the course right away (Driving Range tools).
+  void spawnPin() {
+    pins
+      ..clear()
+      ..add(SPin(const V2(StoryLayout.width / 2, 300), rules.n('overcharge.flagLifetime') * 2));
+  }
+
   // ---------------------------------------------------------------- enemies
 
   void _slow(SEnemy e, double amount, double seconds) {
     if (e.spec.immuneSlow) return;
     e.slowTimer = math.max(e.slowTimer, seconds);
-    e.slowAmount = e.slowTimer > 0 ? math.max(e.slowAmount, amount) : amount;
+    e.slowAmount = math.max(e.slowAmount, amount);
   }
 
   SEnemy? _nearest(V2 from, bool Function(SEnemy) ok, {double range = double.infinity}) {
@@ -994,10 +1169,11 @@ class RoundSim {
     return best;
   }
 
-  STower? _nearestTower(V2 from) {
+  STower? _nearestTower(V2 from, {double range = double.infinity}) {
     STower? best;
-    var bestD = double.infinity;
+    var bestD = range;
     for (final t in towers) {
+      if (t.destroyed) continue;
       final d = t.pos.distanceTo(from);
       if (d < bestD) {
         bestD = d;
@@ -1007,7 +1183,7 @@ class RoundSim {
     return best;
   }
 
-  double get _hpScale => 1 + rules.n('waves.hpPerHole') * (holeNumber - 1);
+  double get _hpScale => 1 + (endless ? rules.n('arcade.endlessHpPerWave') * (wave - 1) : rules.n('waves.hpPerHole') * (holeNumber - 1));
 
   V2 _edgePoint(double radius) {
     final sideMax = rules.n('pathfinding.sideSpawnMaxY');
@@ -1041,7 +1217,7 @@ class RoundSim {
         default:
           p = V2(w.right + margin, w.top + rng.nextDouble() * w.height);
       }
-      if (p.x < radius || p.x > StoryLayout.width - radius || p.y < StoryLayout.spawnTop + radius || p.y > StoryLayout.teeLine - 60) continue;
+      if (p.x < radius || p.x > StoryLayout.width - radius || p.y < StoryLayout.spawnTop + radius || p.y > StoryLayout.fairway.bottom) continue;
       if (!flow.blockedAt(p) && flow.reachable(p)) return p;
     }
     return null;
@@ -1057,7 +1233,7 @@ class RoundSim {
       id: _nextId++,
       spec: spec,
       pos: pos,
-      maxHp: spec.hp * _hpScale * (mini ? r.n('miniBoss.hp') : 1),
+      maxHp: spec.hp * (spec.target ? 1 : _hpScale) * (mini ? r.n('miniBoss.hp') : 1),
       radius: radius,
       speed: spec.speed,
       damage: spec.damage * (mini ? r.n('miniBoss.damage') : 1),
@@ -1079,8 +1255,17 @@ class RoundSim {
     return e;
   }
 
+  /// Places a stationary practice target on the fairway (Driving Range).
+  SEnemy spawnTarget(String id) {
+    for (var tries = 0; tries < 30; tries++) {
+      final p = V2(40 + rng.nextDouble() * (StoryLayout.width - 80), 160 + rng.nextDouble() * 260);
+      if (!FlowField.isObstacle(hazards, p, 20)) return spawnEnemy(id, at: p);
+    }
+    return spawnEnemy(id, at: const V2(195, 300));
+  }
+
   SEnemy spawnFinalBoss() {
-    final b = content.bossForHole(holeNumber);
+    final b = _finalBoss;
     final r = rules;
     final radius = r.n('finalBoss.radius');
     final spec = StoryEnemy(
@@ -1101,7 +1286,7 @@ class RoundSim {
       id: _nextId++,
       spec: spec,
       pos: V2(StoryLayout.width / 2, StoryLayout.spawnTop + radius + 1),
-      maxHp: b.hp * (1 + r.n('finalBoss.hpPerHole') * (holeNumber - 1)) * hole.bossHpMultiplier,
+      maxHp: b.hp * (1 + r.n('finalBoss.hpPerHole') * (difficulty - 1)) * hole.bossHpMultiplier,
       radius: radius,
       speed: spec.speed,
       damage: spec.damage,
@@ -1125,7 +1310,7 @@ class RoundSim {
       if (finalBossRound) {
         spawnFinalBoss();
       } else {
-        spawnEnemy(hole.featured, mini: true);
+        spawnEnemy(_featured, mini: true);
       }
       _spawnTimer = rules.n('waves.spawnInterval');
       return;
@@ -1153,6 +1338,7 @@ class RoundSim {
         damageEnemy(e, e.burnDps * dt, quiet: true);
         if (!e.alive) continue;
       }
+      if (e.stationary) continue;
       _ability(e, dt);
       if (!e.alive) continue;
       _move(e, dt);
@@ -1177,9 +1363,8 @@ class RoundSim {
     final a = e.spec.ability;
     if (a == null || a.type != 'honk' || e.abilityTimer > 0) return;
     e.abilityTimer = a.every;
-    final near = towers.where((t) => t.pos.distanceTo(e.pos) < a.radius).toList();
-    for (final t in near) {
-      t.stun = math.max(t.stun, a.stun);
+    for (final t in towers) {
+      if (t.pos.distanceTo(e.pos) < a.radius) t.stun = math.max(t.stun, a.stun);
     }
     fx.add(Fx(FxKind.honk, [e.pos], ttl: 0.5, radius: a.radius, colorValue: 0xFFFFFFFF));
   }
@@ -1200,8 +1385,7 @@ class RoundSim {
             for (var r = 0; r < StoryLayout.plotRows; r++)
               if (towerAt(c, r) == null) (c, r),
         ]..shuffle(rng);
-        final picks = [...occupied, ...empty].take(a.count);
-        for (final p in picks) {
+        for (final p in [...occupied, ...empty].take(a.count)) {
           disabledPlots[p] = a.seconds;
           fx.add(Fx(FxKind.explosion, [StoryLayout.plotCenter(p.$1, p.$2)], ttl: 0.5, radius: 30, colorValue: 0xFF8D6E63));
         }
@@ -1210,8 +1394,8 @@ class RoundSim {
 
   void _summon(SEnemy e, String id, int n) {
     for (var i = 0; i < n; i++) {
-      var p = e.pos + V2((i - (n - 1) / 2) * 26, e.radius + 6);
-      if (flow.blockedAt(p) || p.x < 8 || p.x > StoryLayout.width - 8) p = e.pos;
+      var p = e.pos + V2((i - (n - 1) / 2) * 26, -e.radius - 6);
+      if (flow.blockedAt(p) || p.x < 8 || p.x > StoryLayout.width - 8 || p.y < StoryLayout.spawnTop) p = e.pos;
       spawnEnemy(id, at: p);
     }
     fx.add(Fx(FxKind.honk, [e.pos], ttl: 0.6, radius: 60, colorValue: e.spec.color));
@@ -1220,6 +1404,7 @@ class RoundSim {
   double _speedOf(SEnemy e) {
     if (e.snareTimer > 0) return 0;
     var s = e.speed * (1 - perkSum('enemySlow'));
+    if (modifier == DailyModifier.stampede) s *= 1.25;
     final leader = e.leader;
     if (leader != null && leader.alive) s *= 1 + (leader.spec.ability?.speedBonus ?? 0);
     if (!e.flier && hazards.sand.any((b) => b.contains(e.pos))) s *= 1 - rules.n('hazards.sandSlow');
@@ -1227,50 +1412,72 @@ class RoundSim {
     return s;
   }
 
-  V2 _teeGoal(V2 p) => V2(p.x.clamp(StoryLayout.teeBox.left + 8, StoryLayout.teeBox.right - 8).toDouble(), StoryLayout.teeLine);
+  double _attackInterval(SEnemy e) => e.boss ? rules.n('attack.bossInterval') : rules.n('attack.interval');
 
+  bool _touching(SEnemy e, STower t) => e.pos.distanceTo(t.pos) <= e.radius + StoryLayout.towerRadius + 2;
+
+  /// Enemies walk to the ball, stopping to attack any tower in their way, and
+  /// stay where they are attacking until they die.
   void _move(SEnemy e, double dt) {
-    // Bosses walk back to the top after hitting the tee box.
-    if (e.retreating) {
-      e.pos = e.pos + V2(0, -math.max(60, e.speed * 3) * dt);
-      if (e.pos.y <= StoryLayout.spawnTop + e.radius + 4) e.retreating = false;
-      return;
-    }
-    if (e.fleeing) {
-      e.pos = e.pos + V2(0, -e.speed * 1.3 * dt);
-      if (e.pos.y < StoryLayout.spawnTop - e.radius) e.removed = true;
-      return;
-    }
     final speed = _speedOf(e);
     final type = e.abilityType;
-    if (e.flier) {
-      V2 target = _teeGoal(e.pos);
-      final tower = type == 'dive' && !e.dived ? _nearestTower(e.pos) : null;
-      if (tower != null) target = tower.pos;
-      final to = target - e.pos;
-      if (to.length > 1) e.pos = e.pos + to.normalized() * math.min(to.length, speed * dt);
-      if (tower != null && e.pos.distanceTo(tower.pos) < e.radius + 18) {
-        tower.disabled = math.max(tower.disabled, e.spec.ability!.disable);
-        e.dived = true;
-        fx.add(Fx(FxKind.gib, [tower.pos], ttl: 0.3, colorValue: 0xFF263238));
+
+    // Attacking a tower: stay until it falls.
+    final target = e.attacking;
+    if (target != null && !target.destroyed) {
+      if (!_touching(e, target)) {
+        _step(e, target.pos, speed, dt);
+        return;
       }
-    } else if (type == 'bomber' && e.pos.y >= StoryLayout.teeLine - 20 && towers.isNotEmpty) {
-      final tower = _nearestTower(e.pos)!;
-      final to = tower.pos - e.pos;
-      e.pos = e.pos + to.normalized() * math.min(to.length, speed * dt);
-      if (e.pos.distanceTo(tower.pos) < e.radius + 20) {
-        tower.disabled = math.max(tower.disabled, e.spec.ability!.disable);
-        fx.add(Fx(FxKind.explosion, [e.pos], ttl: 0.4, radius: 45, colorValue: 0xFFFF6D00));
-        _arrive(e);
-      }
+      _attackTower(e, target, dt);
       return;
-    } else if (type == 'charge') {
-      _moveBoar(e, speed, dt);
-    } else {
-      final dir = flow.direction(e.pos);
-      e.pos = e.pos + dir * (speed * dt);
     }
-    if (e.pos.y >= StoryLayout.teeLine - 1) _arrive(e);
+    e.attacking = null;
+
+    if (e.atBall) {
+      _attackBall(e, dt);
+      return;
+    }
+
+    if (e.flier) {
+      final tower = type == 'dive' && !e.dived ? _nearestTower(e.pos) : null;
+      if (tower != null) {
+        _step(e, tower.pos, speed, dt);
+        if (_touching(e, tower)) {
+          tower.disabled = math.max(tower.disabled, e.spec.ability!.disable);
+          damageTower(tower, e.damage);
+          e.dived = true;
+          fx.add(Fx(FxKind.gib, [tower.pos], ttl: 0.3, colorValue: 0xFF263238));
+        }
+        return;
+      }
+      _step(e, StoryLayout.golfer, speed, dt);
+    } else {
+      // Bombers seek towers from further away.
+      final reach = type == 'bomber' ? rules.n('attack.bomberReach') : rules.n('attack.towerReach');
+      final tower = _nearestTower(e.pos, range: e.radius + StoryLayout.towerRadius + reach);
+      if (tower != null) {
+        e.attacking = tower;
+        e.chargeDir = null;
+        if (_touching(e, tower)) _attackTower(e, tower, dt);
+        return;
+      }
+      if (type == 'charge') {
+        _moveBoar(e, speed, dt);
+      } else {
+        e.pos = e.pos + flow.direction(e.pos) * (speed * dt);
+      }
+    }
+    if (e.pos.distanceTo(StoryLayout.golfer) <= e.radius + StoryLayout.ballReach) {
+      e.atBall = true;
+      e.chargeDir = null;
+      _reachBall(e);
+    }
+  }
+
+  void _step(SEnemy e, V2 to, double speed, double dt) {
+    final d = to - e.pos;
+    if (d.length > 1e-6) e.pos = e.pos + d.normalized() * math.min(d.length, speed * dt);
   }
 
   void _moveBoar(SEnemy e, double speed, double dt) {
@@ -1278,8 +1485,8 @@ class RoundSim {
     e.chargeCooldown = math.max(0, e.chargeCooldown - dt);
     final dir = e.chargeDir;
     if (dir != null) {
-      final next = e.pos + dir * (a.speed * (e.snareTimer > 0 ? 0 : 1) * dt);
-      if (next.y < StoryLayout.teeLine && flow.blockedAt(next)) {
+      final next = e.pos + dir * (a.speed * dt);
+      if (flow.blockedAt(next) || next.distanceTo(StoryLayout.golfer) > e.pos.distanceTo(StoryLayout.golfer)) {
         e.chargeDir = null;
         e.chargeCooldown = 2;
         return;
@@ -1289,48 +1496,67 @@ class RoundSim {
     }
     if (e.pauseTimer > 0) {
       e.pauseTimer -= dt;
-      if (e.pauseTimer <= 0) e.chargeDir = (_teeGoal(e.pos) - e.pos).normalized();
+      if (e.pauseTimer <= 0) e.chargeDir = (StoryLayout.golfer - e.pos).normalized();
       return;
     }
-    final goal = _teeGoal(e.pos);
-    if (e.chargeCooldown <= 0 && e.pos.distanceTo(goal) > 80 && flow.lineClear(e.pos, goal)) {
+    if (e.chargeCooldown <= 0 && e.pos.distanceTo(StoryLayout.golfer) > 80 && flow.lineClear(e.pos, StoryLayout.golfer)) {
       e.pauseTimer = a.pause;
       return;
     }
     e.pos = e.pos + flow.direction(e.pos) * (speed * dt);
   }
 
-  /// An enemy reached the tee box: it deals its damage once and is removed.
-  /// Raccoons also steal and flee; bosses retreat and advance again.
-  void _arrive(SEnemy e) {
+  /// First contact with the ball: raccoons steal, bombers explode, skunks gas.
+  void _reachBall(SEnemy e) {
     final a = e.spec.ability;
-    if (e.boss) {
-      damageTee(e.damage);
-      e.retreating = true;
-      e.chargeDir = null;
-      if (a?.type == 'gas') _gas(e);
-      return;
+    switch (a?.type) {
+      case 'thief':
+        e.stolen = math.min(coins, a!.steal);
+        coins -= e.stolen;
+        if (e.stolen > 0) fx.add(Fx(FxKind.text, [e.pos], ttl: 0.8, text: '-${e.stolen}', colorValue: 0xFFFFEB3B));
+      case 'bomber':
+        fx.add(Fx(FxKind.explosion, [e.pos], ttl: 0.4, radius: 45, colorValue: 0xFFFF6D00));
+        damageTee(e.damage);
+        e.removed = true;
+        return;
+      case 'gas':
+        _gas(e);
     }
-    if (a?.type == 'thief') {
-      e.stolen = math.min(coins, a!.steal);
-      coins -= e.stolen;
-      e.fleeing = true;
-      if (e.stolen > 0) fx.add(Fx(FxKind.text, [e.pos], ttl: 0.8, text: '-${e.stolen}', colorValue: 0xFFFFEB3B));
-      damageTee(e.damage);
-      return;
-    }
-    if (a?.type == 'gas') _gas(e);
-    e.removed = true;
+    _attackBall(e, 0);
+  }
+
+  void _attackBall(SEnemy e, double dt) {
+    e.attackTimer -= dt;
+    if (e.attackTimer > 0) return;
+    e.attackTimer = _attackInterval(e);
     damageTee(e.damage);
   }
 
+  void _attackTower(SEnemy e, STower t, double dt) {
+    final a = e.spec.ability;
+    if (a?.type == 'bomber') {
+      t.disabled = math.max(t.disabled, a!.disable);
+      damageTower(t, e.damage);
+      fx.add(Fx(FxKind.explosion, [e.pos], ttl: 0.4, radius: 45, colorValue: 0xFFFF6D00));
+      e.removed = true;
+      return;
+    }
+    if (a?.type == 'gas') _gas(e);
+    e.attackTimer -= dt;
+    if (e.attackTimer > 0) return;
+    e.attackTimer = _attackInterval(e);
+    damageTower(t, e.damage);
+  }
+
   void _gas(SEnemy e) {
+    if (e.gassed) return;
+    e.gassed = true;
     final a = e.spec.ability!;
     gas.add(SGas(e.pos, a.radius, a.disable));
   }
 
   void damageTee(double amount) {
-    if (finished || phase == RoundPhase.revive) return;
+    if (finished || phase == RoundPhase.revive || _grace > 0 || range) return;
     health -= amount;
     shake = math.max(shake, 0.2);
     if (health > 0) return;
@@ -1343,11 +1569,12 @@ class RoundSim {
         phase = RoundPhase.revive;
       } else {
         phase = RoundPhase.lost;
-        _say('The tee box has fallen');
+        _say('The ball has fallen');
       }
       return;
     }
     health = rules.n('teeBox.flagRestoreHealth');
+    _grace = rules.n('teeBox.flagGrace');
     _say('A flag has fallen!');
   }
 
@@ -1359,8 +1586,13 @@ class RoundSim {
     if (e.markTimer > 0) m *= 1 + e.markAmount;
     if (e.sniperMarkTimer > 0) m *= 1 + content.towers.firstWhere((t) => t.kind == TowerKind.sniper).stat('mark');
     if (e.boss) m *= 1 + perkSum('bossDamage') + caddiePassive('bossDamage');
-    e.hp -= amount * m;
-    if (!quiet) e.hitFlash = 0.1;
+    final dealt = amount * m;
+    e.hp -= dealt;
+    damageDealt += dealt;
+    if (!quiet) {
+      e.hitFlash = 0.1;
+      lastHit = dealt;
+    }
     if (e.hp <= 0) _kill(e);
   }
 
@@ -1369,7 +1601,9 @@ class RoundSim {
     e.removed = true;
     kills++;
     killsById[e.spec.id] = (killsById[e.spec.id] ?? 0) + 1;
-    coins += (e.coins * comboMultiplier * (1 + perkSum('coinGain'))).round();
+    var reward = e.coins * comboMultiplier * (1 + perkSum('coinGain'));
+    if (modifier == DailyModifier.glassTee) reward *= 1.5;
+    coins += reward.round();
     coins += e.stolen;
     if (e.abilityType == 'gas') _gas(e);
     fx.add(Fx(FxKind.gib, [e.pos], ttl: e.boss ? 1.2 : 0.7, radius: e.radius, colorValue: e.spec.color));
@@ -1390,13 +1624,14 @@ class RoundSim {
       }
       final magnet = b.stats.effect?.type == 'magnet' ? b.stats.effect!.radius : 0.0;
       if (magnet > 0) {
-        final e = _nearest(b.pos, (e) => e.targetable && (b.stats.hitsFliers || !e.flier) && !b.hitIds.contains(e.id), range: magnet);
+        final e = _nearest(b.pos, (e) => _hittable(b.stats, e) && !b.hitIds.contains(e.id), range: magnet);
         if (e != null) {
           final speed = b.vel.length;
           final want = (e.pos - b.pos).normalized() * speed;
           b.vel = (b.vel + (want - b.vel) * math.min(1, 6 * dt)).normalized() * speed;
         }
       }
+      if (modifier == DailyModifier.windy) b.vel = b.vel + V2(45 * dt, 0);
       final stepLen = b.vel.length * dt;
       final steps = math.max(1, (stepLen / 4).ceil());
       final step = dt / steps;
@@ -1432,7 +1667,7 @@ class RoundSim {
       }
       return;
     }
-    if (b.pos.y > StoryLayout.teeLine - 10 && b.vel.y > 0) _endBall(b);
+    if (b.pos.y > StoryLayout.clubBar.top && b.vel.y > 0) _endBall(b);
   }
 
   void _ballHazards(SBall b) {
@@ -1442,7 +1677,6 @@ class RoundSim {
       var n = b.pos - c;
       if (n.length > b.radius) continue;
       if (n.length < 1e-6) {
-        // Centre inside the fence: push out along the shallowest side.
         final dl = b.pos.x - f.left, dr = f.right - b.pos.x, dt = b.pos.y - f.top, db = f.bottom - b.pos.y;
         final m = [dl, dr, dt, db].reduce(math.min);
         n = m == dl
@@ -1474,11 +1708,9 @@ class RoundSim {
     }
   }
 
-  bool _canHit(SBall b, SEnemy e) => e.targetable && (b.stats.hitsFliers || !e.flier);
-
   void _ballEnemies(SBall b) {
     for (final e in List.of(enemies)) {
-      if (!_canHit(b, e) || b.hitIds.contains(e.id)) continue;
+      if (!_hittable(b.stats, e) || b.hitIds.contains(e.id)) continue;
       if (e.pos.distanceTo(b.pos) > e.radius + b.radius) continue;
       b.hitIds.add(e.id);
       _ballHit(b, e);
@@ -1504,9 +1736,13 @@ class RoundSim {
     if (effect != null) {
       switch (effect.type) {
         case 'knockback':
-          if (!e.boss && e.alive) {
+          if (!e.boss && e.alive && !e.stationary) {
             final p = e.pos + b.vel.normalized() * effect.distance;
-            if (e.flier || (!flow.blockedAt(p) && p.y > StoryLayout.spawnTop && p.x > 0 && p.x < StoryLayout.width)) e.pos = p;
+            if (e.flier || (!flow.blockedAt(p) && p.y > StoryLayout.spawnTop && p.x > 0 && p.x < StoryLayout.width)) {
+              e.pos = p;
+              e.attacking = null;
+              e.atBall = false;
+            }
           }
         case 'burn':
           if (e.alive) {
@@ -1576,22 +1812,20 @@ class RoundSim {
   // ---------------------------------------------------------------- update
 
   void update(double realDt) {
-    final dt0 = realDt.clamp(0.0, 0.05);
+    final dt = realDt.clamp(0.0, 0.05);
     for (final f in fx) {
-      f.ttl -= dt0;
+      f.ttl -= dt;
     }
     fx.removeWhere((f) => f.ttl <= 0);
-    shake = math.max(0, shake - dt0);
+    shake = math.max(0, shake - dt);
     if (bannerTimer > 0) {
-      bannerTimer -= dt0;
+      bannerTimer -= dt;
       if (bannerTimer <= 0) banner = null;
     }
-    if (aiming) aimTime += dt0;
+    if (aiming) aimTime += dt;
     if (!playing) return;
-    final slowed = slowMo > 0;
-    slowMo = math.max(0, slowMo - dt0);
-    final dt = slowed ? dt0 * rules.n('coins.slowMoSpeed') : dt0;
     time += dt;
+    _grace = math.max(0, _grace - dt);
     for (var i = 0; i < cooldowns.length; i++) {
       cooldowns[i] = math.max(0, cooldowns[i] - dt);
     }
@@ -1607,6 +1841,8 @@ class RoundSim {
       g.time -= dt;
     }
     gas.removeWhere((g) => g.time <= 0);
+    if (range) _rangeUpkeep();
+    if (setup.autoCaddie) _autoSwing();
 
     if (phase == RoundPhase.buildBreak) {
       breakTimer -= dt;
@@ -1614,7 +1850,7 @@ class RoundSim {
       _updateFore(dt);
       _updateBalls(dt);
       balls.removeWhere((b) => b.done);
-      if (breakTimer <= 0) _startWave(wave + 1);
+      if (breakTimer <= 0 && !draftDue) _startWave(wave + 1);
       return;
     }
 
@@ -1627,6 +1863,19 @@ class RoundSim {
     _updateBalls(dt);
     enemies.removeWhere((e) => !e.alive);
     balls.removeWhere((b) => b.done);
-    if (phase == RoundPhase.wave && _spawnQueue.isEmpty && !_bossPending && enemies.isEmpty) _waveCleared();
+    if (!range && phase == RoundPhase.wave && _spawnQueue.isEmpty && !_bossPending && enemies.isEmpty) _waveCleared();
+  }
+
+  /// Driving Range: free coins, a full Fore! meter, full health, targets that come back.
+  void _rangeUpkeep() {
+    if (coins < 9999) coins = 9999;
+    if (!foreFiring) foreMeter = maxFore;
+    health = maxHealth;
+    caddieUsed = false;
+    if (!enemies.any((e) => e.alive)) {
+      for (final id in const ['dummy', 'dummy', 'dummy_air']) {
+        spawnTarget(id);
+      }
+    }
   }
 }

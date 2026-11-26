@@ -6,9 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show HSVColor;
 
 import '../../meta/profile.dart';
-import '../../sim/entities.dart' show Fx, FxKind;
 import '../../sim/vec.dart';
 import '../content.dart';
+import '../sim/fx.dart';
 import '../sim/layout.dart';
 import '../sim/round_sim.dart';
 
@@ -29,6 +29,9 @@ class RoundGame extends FlameGame {
   /// Plot highlighted by a sheet or a tap.
   (int, int)? selectedPlot;
 
+  /// True while a tower sheet or a draft is open: the round holds still.
+  bool frozen = false;
+
   double _hudAccumulator = 0;
   RoundPhase _lastPhase = RoundPhase.prep;
   double _t = 0;
@@ -40,7 +43,7 @@ class RoundGame extends FlameGame {
   void update(double dt) {
     super.update(dt);
     _t += dt;
-    sim.update(dt);
+    if (!frozen) sim.update(dt);
     _hudAccumulator += dt;
     if (_hudAccumulator > 0.1 || sim.phase != _lastPhase) {
       _hudAccumulator = 0;
@@ -86,15 +89,9 @@ class RoundGame extends FlameGame {
     for (var y = StoryLayout.fairway.top; y < StoryLayout.fairway.bottom; y += 60) {
       canvas.drawRect(Rect.fromLTWH(0, y, StoryLayout.width, 30), stripe);
     }
-    // Apron between the fairway and the tee box, where the golfer stands.
+    // Rough around the build zone and the tee where the golfer stands.
     canvas.drawRect(Rect.fromLTRB(0, StoryLayout.fairway.bottom, StoryLayout.width, StoryLayout.clubBar.top), Paint()..color = const Color(0xFF1E5E24));
-    canvas.drawLine(
-      const Offset(0, StoryLayout.teeLine),
-      const Offset(StoryLayout.width, StoryLayout.teeLine),
-      Paint()
-        ..color = const Color(0x55FFFFFF)
-        ..strokeWidth = 1,
-    );
+    canvas.drawOval(Rect.fromCenter(center: _o(StoryLayout.golfer + const V2(0, 4)), width: 120, height: 40), Paint()..color = const Color(0xFF43A047));
     canvas.drawRect(_r(StoryLayout.clubBar), Paint()..color = const Color(0xFF102614));
   }
 
@@ -136,7 +133,7 @@ class RoundGame extends FlameGame {
       if (t.spec.kind != TowerKind.sandTrap) continue;
       final p = StoryLayout.plot(t.col, 0);
       final h = t.spec.stat('zoneHeight');
-      canvas.drawRect(Rect.fromLTRB(p.left + 2, StoryLayout.teeLine - h, p.right - 2, StoryLayout.teeLine), Paint()..color = const Color(0x88E6D29A));
+      canvas.drawRect(Rect.fromLTRB(p.left + 2, StoryLayout.teeBox.top - h, p.right - 2, StoryLayout.teeBox.top), Paint()..color = const Color(0x88E6D29A));
     }
     final line = Paint()
       ..style = PaintingStyle.stroke
@@ -162,7 +159,7 @@ class RoundGame extends FlameGame {
   // ------------------------------------------------------------------ towers
 
   void _drawTowers(Canvas canvas) {
-    const r = StoryLayout.plotSize * 0.36;
+    const r = StoryLayout.towerRadius;
     for (final t in sim.towers) {
       final sel = selectedPlot == (t.col, t.row);
       final range = sim.rangeOf(t);
@@ -179,6 +176,7 @@ class RoundGame extends FlameGame {
       if (t.overcharged) canvas.drawCircle(_o(t.pos), r + 5 + math.sin(_t * 20) * 2, Paint()..color = const Color(0x66FFEB3B));
       var color = Color(t.spec.color);
       if (!t.active) color = Color.lerp(color, const Color(0xFF616161), 0.65)!;
+      if (t.hitFlash > 0) color = const Color(0xFFFF8A80);
       final rect = Rect.fromCircle(center: _o(t.pos), radius: r);
       canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(r * 0.3)), Paint()..color = color);
       if (t.spec.kind == TowerKind.ripper || t.spec.kind == TowerKind.sprinkler) {
@@ -197,6 +195,7 @@ class RoundGame extends FlameGame {
         canvas.drawCircle(Offset(t.pos.x - r + 4 + i * 7, t.pos.y + r - 4), 2.4, Paint()..color = const Color(0xFFFFFFFF));
       }
       if (!t.active) _label(canvas, t.stun > 0 ? 'zz' : '✕', t.pos - const V2(0, r + 8), 11, const Color(0xFFFFFFFF));
+      if (t.hp < t.maxHp) _bar(canvas, t.pos + const V2(0, r + 3), r * 2, t.hp / t.maxHp, const Color(0xFF64DD17));
     }
   }
 
@@ -296,7 +295,7 @@ class RoundGame extends FlameGame {
         canvas.drawLine(c.translate(-rad - 8, 0), c.translate(rad + 8, 0), m);
         canvas.drawLine(c.translate(0, -rad - 8), c.translate(0, rad + 8), m);
       }
-      if (e.fleeing && e.stolen > 0) _label(canvas, '\$', e.pos - V2(0, rad + 8), 12, const Color(0xFFFFEB3B));
+      if (e.stolen > 0) _label(canvas, '\$', e.pos - V2(0, rad + 8), 12, const Color(0xFFFFEB3B));
       if (e.hp < e.maxHp || e.boss) _bar(canvas, e.pos - V2(0, rad + 7), math.max(22, rad * 2), e.hp / e.maxHp, const Color(0xFFE53935));
     }
   }

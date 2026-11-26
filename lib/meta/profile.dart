@@ -1,5 +1,3 @@
-import '../data/clubs.dart';
-
 enum GoreLevel { fullSplat, classic, squeakyClean }
 
 /// Player settings (spec 3 accessibility, spec 11 gore and feel).
@@ -23,139 +21,78 @@ class Settings {
   bool testAds;
 
   Map<String, Object?> toJson() => {
-        'aimAssist': aimAssist,
-        'autoCaddie': autoCaddie,
-        'leftHanded': leftHanded,
-        'gore': gore.name,
-        'screenShake': screenShake,
-        'testAds': testAds,
-      };
+    'aimAssist': aimAssist,
+    'autoCaddie': autoCaddie,
+    'leftHanded': leftHanded,
+    'gore': gore.name,
+    'screenShake': screenShake,
+    'testAds': testAds,
+  };
 
   factory Settings.fromJson(Map<String, Object?> j) => Settings(
-        aimAssist: (j['aimAssist'] as num?)?.toDouble() ?? 0.3,
-        autoCaddie: j['autoCaddie'] as bool? ?? false,
-        leftHanded: j['leftHanded'] as bool? ?? false,
-        gore: GoreLevel.values.firstWhere((g) => g.name == j['gore'], orElse: () => GoreLevel.classic),
-        screenShake: j['screenShake'] as bool? ?? true,
-        testAds: j['testAds'] as bool? ?? false,
-      );
+    aimAssist: (j['aimAssist'] as num?)?.toDouble() ?? 0.3,
+    autoCaddie: j['autoCaddie'] as bool? ?? false,
+    leftHanded: j['leftHanded'] as bool? ?? false,
+    gore: GoreLevel.values.firstWhere((g) => g.name == j['gore'], orElse: () => GoreLevel.classic),
+    screenShake: j['screenShake'] as bool? ?? true,
+    testAds: j['testAds'] as bool? ?? false,
+  );
 }
 
-/// Everything that persists between runs (spec 7).
+/// Settings, the bestiary and arcade records. Story progress lives in the
+/// Story save (`lib/story/save.dart`).
 class Profile {
   Profile({
-    this.coins = 0,
-    this.clubTokens = 0,
-    this.gems = 0,
-    this.xp = 0,
     this.runsPlayed = 0,
-    this.lossStreak = 0,
     this.bestSuddenDeath = 0,
     this.lastDailySeed = 0,
     this.bestDailyScore = 0,
-    List<String>? unlockedClubs,
-    List<String>? bag,
-    Map<String, int>? clubLevels,
-    Map<String, int>? clubhouse,
-    List<String>? caddiesUnlocked,
-    this.equippedCaddie,
     Map<String, int>? bestiary,
     List<String>? tutorialSeen,
     Settings? settings,
-  })  : unlockedClubs = unlockedClubs ?? List.of(starterBag),
-        bag = bag ?? List.of(starterBag),
-        clubLevels = clubLevels ?? {},
-        clubhouse = clubhouse ?? {},
-        caddiesUnlocked = caddiesUnlocked ?? [],
-        bestiary = bestiary ?? {},
-        tutorialSeen = tutorialSeen ?? [],
-        settings = settings ?? Settings();
+  }) : bestiary = bestiary ?? {},
+       tutorialSeen = tutorialSeen ?? [],
+       settings = settings ?? Settings();
 
-  int coins;
-  int clubTokens;
-  int gems;
-  int xp;
+  /// Arcade runs finished.
   int runsPlayed;
-  int lossStreak;
+
+  /// Most waves cleared in Sudden Death.
   int bestSuddenDeath;
   int lastDailySeed;
   int bestDailyScore;
-  List<String> unlockedClubs;
-
-  /// Equipped 3-club bag.
-  List<String> bag;
-  Map<String, int> clubLevels;
-
-  /// Clubhouse upgrade id -> level.
-  Map<String, int> clubhouse;
-  List<String> caddiesUnlocked;
-  String? equippedCaddie;
 
   /// Enemy id -> kills.
   Map<String, int> bestiary;
 
-  /// Tutorial topic ids already shown (`intro`, `enemy:goose`, `build`, `draft`).
+  /// Tutorial topic ids already shown (`welcome`, `range`).
   List<String> tutorialSeen;
   Settings settings;
 
-  int clubLevel(String id) => clubLevels[id] ?? 1;
-  int clubhouseLevel(String id) => clubhouse[id] ?? 0;
-
-  /// Spec 10: meta systems unlock gradually.
-  bool get clubhouseUnlocked => runsPlayed >= 2;
-  bool get bagUnlocked => runsPlayed >= 3;
-  bool get firstRun => runsPlayed == 0;
-
   Map<String, Object?> toJson() => {
-        'v': 1,
-        'coins': coins,
-        'clubTokens': clubTokens,
-        'gems': gems,
-        'xp': xp,
-        'runsPlayed': runsPlayed,
-        'lossStreak': lossStreak,
-        'bestSuddenDeath': bestSuddenDeath,
-        'lastDailySeed': lastDailySeed,
-        'bestDailyScore': bestDailyScore,
-        'unlockedClubs': unlockedClubs,
-        'bag': bag,
-        'clubLevels': clubLevels,
-        'clubhouse': clubhouse,
-        'caddiesUnlocked': caddiesUnlocked,
-        'equippedCaddie': equippedCaddie,
-        'bestiary': bestiary,
-        'tutorialSeen': tutorialSeen,
-        'settings': settings.toJson(),
-      };
+    'v': 2,
+    'runsPlayed': runsPlayed,
+    'bestSuddenDeath': bestSuddenDeath,
+    'lastDailySeed': lastDailySeed,
+    'bestDailyScore': bestDailyScore,
+    'bestiary': bestiary,
+    'tutorialSeen': tutorialSeen,
+    'settings': settings.toJson(),
+  };
 
   factory Profile.fromJson(Map<String, Object?> j) {
     Map<String, int> ints(Object? o) => (o as Map?)?.map((k, v) => MapEntry(k as String, (v as num).toInt())) ?? {};
     List<String> strs(Object? o) => (o as List?)?.cast<String>().toList() ?? [];
-    final p = Profile(
-      coins: (j['coins'] as num?)?.toInt() ?? 0,
-      clubTokens: (j['clubTokens'] as num?)?.toInt() ?? 0,
-      gems: (j['gems'] as num?)?.toInt() ?? 0,
-      xp: (j['xp'] as num?)?.toInt() ?? 0,
+    // v1 saves counted Sudden Death in holes; v2 counts waves. Old records are dropped.
+    final v2 = (j['v'] as num?) == 2;
+    return Profile(
       runsPlayed: (j['runsPlayed'] as num?)?.toInt() ?? 0,
-      lossStreak: (j['lossStreak'] as num?)?.toInt() ?? 0,
-      bestSuddenDeath: (j['bestSuddenDeath'] as num?)?.toInt() ?? 0,
-      lastDailySeed: (j['lastDailySeed'] as num?)?.toInt() ?? 0,
-      bestDailyScore: (j['bestDailyScore'] as num?)?.toInt() ?? 0,
-      unlockedClubs: j['unlockedClubs'] == null ? null : strs(j['unlockedClubs']),
-      bag: j['bag'] == null ? null : strs(j['bag']),
-      clubLevels: ints(j['clubLevels']),
-      clubhouse: ints(j['clubhouse']),
-      caddiesUnlocked: strs(j['caddiesUnlocked']),
-      equippedCaddie: j['equippedCaddie'] as String?,
+      bestSuddenDeath: v2 ? (j['bestSuddenDeath'] as num?)?.toInt() ?? 0 : 0,
+      lastDailySeed: v2 ? (j['lastDailySeed'] as num?)?.toInt() ?? 0 : 0,
+      bestDailyScore: v2 ? (j['bestDailyScore'] as num?)?.toInt() ?? 0 : 0,
       bestiary: ints(j['bestiary']),
       tutorialSeen: strs(j['tutorialSeen']),
       settings: j['settings'] == null ? null : Settings.fromJson((j['settings'] as Map).cast<String, Object?>()),
     );
-    // Drop anything that no longer exists in data.
-    final known = clubs.map((c) => c.id).toSet();
-    p.unlockedClubs.retainWhere(known.contains);
-    p.bag.retainWhere(p.unlockedClubs.contains);
-    if (p.bag.isEmpty) p.bag = List.of(starterBag);
-    return p;
   }
 }

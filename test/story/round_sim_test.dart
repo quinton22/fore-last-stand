@@ -130,6 +130,11 @@ void main() {
     expect(s.health, 30);
     expect(s.flagsLost, 1);
     s.damageTee(30);
+    expect(s.flags, 2, reason: 'a short grace period after a flag falls');
+    s.enemies.clear();
+    runUntil(s, () => false, seconds: 1.6);
+    s.damageTee(30);
+    runUntil(s, () => false, seconds: 1.6);
     s.damageTee(30);
     expect(s.phase, RoundPhase.lost);
   });
@@ -150,6 +155,8 @@ void main() {
     expect(near.alive, isFalse);
     expect(far.alive, isTrue);
     expect(boss.pos.y, lessThan(150));
+    s.enemies.clear();
+    runUntil(s, () => false, seconds: 1.6);
     s.damageTee(1000);
     expect(s.phase, RoundPhase.lost, reason: 'once per round attempt');
   });
@@ -185,37 +192,75 @@ void main() {
     expect(boss.speed, 20);
   });
 
-  test('a boss that reaches the tee box deals 40, retreats and comes back', () {
+  test('enemies that reach the ball stay and attack it every second; bosses too', () {
     final s = sim(c, round: 3)..teeOff();
     s.enemies.clear();
+    final goose = s.spawnEnemy('goose', at: StoryLayout.golfer - const V2(0, 20));
+    goose.abilityTimer = 99;
+    s.update(0.02);
+    expect(goose.atBall, isTrue);
+    expect(s.health, 95);
+    runUntil(s, () => s.health <= 90, seconds: 1.5);
+    expect(s.health, 90, reason: 'a second attack after 1 s');
+    expect(goose.alive, isTrue, reason: 'it stays');
+    s.enemies.clear();
+    final healthBefore = s.health;
     final boss = s.spawnFinalBoss();
-    boss.pos = const V2(195, StoryLayout.teeLine - 2);
-    s.update(0.05);
-    expect(s.health, 60);
-    expect(boss.retreating, isTrue);
-    expect(boss.alive, isTrue);
-    runUntil(s, () => !boss.retreating, seconds: 20);
-    expect(boss.pos.y, lessThan(StoryLayout.fairway.top + 40));
+    boss.pos = StoryLayout.golfer - const V2(0, 30);
+    s.update(0.02);
+    expect(boss.atBall, isTrue);
+    expect(s.health, healthBefore - 40 > 0 ? healthBefore - 40 : s.health);
+    runUntil(s, () => false, seconds: 1);
+    expect(boss.pos.distanceTo(StoryLayout.golfer), lessThan(50), reason: 'bosses no longer retreat');
   });
 
-  test('every enemy that reaches the tee box deals its damage once and is removed', () {
+  test('raccoons steal 15 coins on reaching the ball and stay; killing one returns them', () {
     final s = sim(c, hole: 9, coins: 100)..teeOff();
     s.enemies.clear();
-    final goose = s.spawnEnemy('goose', at: const V2(195, StoryLayout.teeLine - 1.5));
-    goose.abilityTimer = 99;
-    s.update(0.05);
-    expect(goose.alive, isFalse);
-    expect(s.health, 95);
-    final raccoon = s.spawnEnemy('raccoon', at: const V2(150, StoryLayout.teeLine - 1.5));
-    s.update(0.05);
-    expect(raccoon.fleeing, isTrue);
+    final raccoon = s.spawnEnemy('raccoon', at: StoryLayout.golfer - const V2(0, 20));
+    s.update(0.02);
+    expect(raccoon.atBall, isTrue);
     expect(raccoon.stolen, 15);
     expect(s.coins, 85);
     s.damageEnemy(raccoon, 1e6);
     expect(s.coins, greaterThanOrEqualTo(100), reason: 'killing it returns the coins');
   });
 
-  test('towers: unlocks, costs, live placement doubles cost with slow motion, 70% refund, 3 levels', () {
+  test('towers take damage from enemies in their way and are destroyed at 0', () {
+    final s = sim(c, coins: 1000);
+    final t = s.placeTower('range', 1, 0)!;
+    expect(t.hp, 60);
+    s.teeOff();
+    s.enemies.clear();
+    final goose = s.spawnEnemy('gator', at: t.pos - const V2(0, 40));
+    runUntil(s, () => t.hp < 60, seconds: 1);
+    expect(goose.attacking, t);
+    expect(t.hp, 45, reason: 'a gator hits for 15');
+    // It stays at the tower until the tower falls, then heads for the ball.
+    runUntil(s, () => t.destroyed, seconds: 30);
+    expect(t.destroyed, isTrue);
+    s.update(0.01);
+    expect(s.towers, isNot(contains(t)));
+    expect(goose.alive, isTrue);
+    runUntil(s, () => goose.atBall, seconds: 30);
+    expect(goose.atBall, isTrue);
+  });
+
+  test('squirrels blow up the tower they reach; upgrading repairs a tower', () {
+    final s = sim(c, hole: 9, coins: 1000);
+    final t = s.placeTower('cannon', 2, 0)!;
+    s.teeOff();
+    s.enemies.clear();
+    final sq = s.spawnEnemy('squirrel', at: t.pos - const V2(0, 60));
+    runUntil(s, () => !sq.alive, seconds: 5);
+    expect(t.hp, lessThan(t.maxHp));
+    expect(t.disabled, greaterThan(0));
+    expect(s.upgradeTower(t), isTrue);
+    expect(t.hp, t.maxHp);
+    expect(t.maxHp, closeTo(100 * 1.4, 1e-9));
+  });
+
+  test('towers: same cost any time, no slow motion, 70% refund, 3 levels', () {
     final s = sim(c, hole: 1, coins: 1000);
     expect(s.placeCost(c.tower('range')), 50);
     final t = s.placeTower('range', 0, 0)!;
@@ -229,22 +274,26 @@ void main() {
     expect(s.placeTower('ripper', 1, 2), isNull, reason: 'ripper is front row only');
     expect(s.placeTower('ripper', 1, 0), isNotNull);
     s.teeOff();
-    expect(s.placeCost(c.tower('range')), 100);
-    s.placeTower('range', 3, 3);
-    expect(s.slowMo, 2);
+    expect(s.placeCost(c.tower('range')), 50, reason: 'no extra cost during a wave');
+    expect(s.placeTower('range', 3, 3), isNotNull);
   });
 
-  test('tower targeting picks the enemy nearest the tee box', () {
+  test('tower targeting picks the enemy nearest the ball', () {
     final s = sim(c, coins: 1000)..teeOff();
     s.enemies.clear();
     s.placeTower('range', 1, 0);
-    s.slowMo = 0;
-    final far = s.spawnEnemy('goose', at: const V2(170, 420));
-    final close = s.spawnEnemy('goose', at: const V2(230, 470));
+    final far = s.spawnEnemy('goose', at: const V2(170, 380));
+    final close = s.spawnEnemy('goose', at: const V2(230, 420));
     far.abilityTimer = close.abilityTimer = 99;
     s.update(0.02);
     expect(close.hp, lessThan(close.maxHp));
     expect(far.hp, far.maxHp);
+  });
+
+  test('the build zone sits in front of the ball, which is near the bottom', () {
+    expect(StoryLayout.golfer.y, greaterThan(StoryLayout.teeBox.bottom));
+    expect(StoryLayout.teeBox.top, greaterThan(StoryLayout.fairway.bottom));
+    expect(StoryLayout.golfer.y, lessThan(StoryLayout.clubBar.top));
   });
 
   test('perks: coins now and tee health apply at Tee Off; tower cost -20% in Prep', () {
@@ -307,12 +356,14 @@ void main() {
     s.enemies.clear();
     s.beginAim();
     final putt = s.release(0, 120).single;
+    putt.pos = const V2(195, 330); // just below the pond (y 230-310)
+    putt.distance = 300;
     runUntil(s, () => putt.done, seconds: 3);
-    expect(putt.pos.y, greaterThan(230), reason: 'stopped at the pond (y 230-310)');
+    expect(putt.pos.y, greaterThan(300), reason: 'lost in the pond');
     s.selectSlot(1);
     final gator = s.spawnEnemy('gator', at: const V2(195, 200));
     s.beginAim();
-    final lob = s.release(0, 120 * (548 - 200 - 126) / 234 + 0).single;
+    final lob = s.release(0, 120).single;
     expect(lob.isLob, isTrue);
     gator.pos = lob.lobTarget!;
     gator.slowTimer = 99;

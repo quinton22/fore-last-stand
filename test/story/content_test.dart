@@ -70,10 +70,10 @@ void main() {
       for (final start in const [V2(20, 90), V2(195, 90), V2(370, 90), V2(8, 300), V2(382, 300)]) {
         if (flow.blockedAt(start)) continue;
         var p = start;
-        for (var i = 0; i < 4000 && p.y < StoryLayout.teeLine; i++) {
+        for (var i = 0; i < 4000 && p.distanceTo(StoryLayout.golfer) > 20; i++) {
           p = p + flow.direction(p) * 2;
         }
-        expect(p.y, greaterThanOrEqualTo(StoryLayout.teeLine - 1), reason: 'hole ${h.number} from $start got stuck at $p');
+        expect(p.distanceTo(StoryLayout.golfer), lessThanOrEqualTo(20), reason: 'hole ${h.number} from $start got stuck at $p');
       }
     }
   });

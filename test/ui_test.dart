@@ -14,7 +14,7 @@ void main() {
   setUpAll(() async => content = await loadContent());
   StoryStore story([StorySave? save]) => StoryStore(content, save ?? StorySave(), MemorySaveBackend());
 
-  testWidgets('home screen lists the modes and gates meta screens', (tester) async {
+  testWidgets('home screen lists Story, the arcade modes and the range', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 1500));
     await tester.pumpWidget(ForeApp(store: ProfileStore(Profile()), story: story()));
     expect(find.text('Story'), findsOneWidget);
@@ -22,7 +22,6 @@ void main() {
     expect(find.text('Full Round'), findsNothing);
     expect(find.text('Sudden Death'), findsOneWidget);
     expect(find.text('Daily Tournament'), findsOneWidget);
-    expect(find.text('after 3 rounds'), findsOneWidget);
     expect(find.text('Driving Range'), findsOneWidget);
     expect(find.text('Welcome to Fore! Last Stand'), findsOneWidget);
   });
@@ -41,7 +40,7 @@ void main() {
     expect(store.profile.settings.gore, GoreLevel.squeakyClean);
   });
 
-  testWidgets('a run screen renders the HUD', (tester) async {
+  testWidgets('Sudden Death runs on the Story engine', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 800));
     await tester.pumpWidget(ForeApp(store: ProfileStore(Profile(tutorialSeen: ['welcome'])), story: story()));
     await tester.ensureVisible(find.text('Sudden Death'));
@@ -49,9 +48,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.textContaining('Hole 1/∞'), findsOneWidget);
+    expect(find.textContaining('Sudden Death · '), findsOneWidget);
     expect(find.text('FORE!'), findsOneWidget);
-    expect(find.text('Driver'), findsOneWidget);
+    expect(find.text('Rusty 7-Iron'), findsOneWidget, reason: 'arcade modes use the Story bag');
+    expect(find.textContaining('Draft a perk'), findsOneWidget);
   });
 
   testWidgets('the Driving Range starts a guided tutorial and advances on goals', (tester) async {
@@ -75,7 +75,7 @@ void main() {
     await tester.pump();
     expect(find.textContaining('Lesson'), findsNothing);
     expect(store.profile.tutorialSeen, contains('range'));
-    expect(find.text('Range tools'), findsOneWidget);
+    expect(find.byTooltip('Range tools'), findsOneWidget);
   });
 
   testWidgets('the bestiary describes every animal before you meet it', (tester) async {
@@ -85,6 +85,8 @@ void main() {
     await tester.tap(find.text('Bestiary'));
     await tester.pumpAndSettle();
     expect(find.text('Goose'), findsOneWidget);
-    expect(find.textContaining('honk stuns every tower'), findsOneWidget);
+    expect(find.textContaining('stunning towers within 80'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Goose King'), 300);
+    expect(find.text('Goose King'), findsOneWidget);
   });
 }

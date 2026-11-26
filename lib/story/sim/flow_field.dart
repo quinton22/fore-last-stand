@@ -4,15 +4,15 @@ import '../../sim/vec.dart';
 import '../content.dart';
 import 'layout.dart';
 
-/// A flow field over the fairway (6a.7 Pathfinding): a grid of square cells,
-/// built once per hole, that leads ground enemies to the tee box. Water,
+/// A flow field over the field (6a.7 Pathfinding): a grid of square cells,
+/// built once per hole, that leads ground enemies to the ball. Water,
 /// fences and trees block cells; sand costs more. Towers never block.
 class FlowField {
   FlowField._(this.cell, this.cols, this.rows, this._blocked, this._cost, this._dist);
 
   factory FlowField.build(Hazards hazards, {double cell = 15, double margin = 8, double sandCost = 1.4}) {
     final cols = (StoryLayout.width / cell).ceil();
-    final rows = ((StoryLayout.teeLine - StoryLayout.spawnTop) / cell).ceil();
+    final rows = ((StoryLayout.fieldBottom - StoryLayout.spawnTop) / cell).ceil();
     final blocked = List<bool>.filled(cols * rows, false);
     final cost = List<double>.filled(cols * rows, 1);
     for (var r = 0; r < rows; r++) {
@@ -24,15 +24,16 @@ class FlowField {
       }
     }
     final dist = List<double>.filled(cols * rows, double.infinity);
-    // Goal: the bottom row of cells over the tee box.
+    // Goal: the cells around the ball.
     final queue = _MinHeap();
-    final goalRow = rows - 1;
-    for (var c = 0; c < cols; c++) {
-      final x = (c + 0.5) * cell;
-      final i = goalRow * cols + c;
-      if (x < StoryLayout.teeBox.left || x > StoryLayout.teeBox.right || blocked[i]) continue;
-      dist[i] = 0;
-      queue.push(0, i);
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        final i = r * cols + c;
+        final centre = V2((c + 0.5) * cell, StoryLayout.spawnTop + (r + 0.5) * cell);
+        if (blocked[i] || centre.distanceTo(StoryLayout.golfer) > cell * 1.5) continue;
+        dist[i] = 0;
+        queue.push(0, i);
+      }
     }
     const dirs = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
     while (queue.isNotEmpty) {
@@ -110,7 +111,10 @@ class FlowField {
   V2 direction(V2 p) {
     if (p.y < StoryLayout.spawnTop) return const V2(0, 1);
     final (c, r) = cellOf(p);
-    if (r == rows - 1 && !blockedCell(c, r)) return const V2(0, 1);
+    if (distanceCell(c, r) == 0 || p.distanceTo(StoryLayout.golfer) < cell * 2) {
+      final to = StoryLayout.golfer - p;
+      return to.length < 1e-6 ? V2.zero : to.normalized();
+    }
     var best = distanceCell(c, r);
     (int, int)? to;
     for (var dr = -1; dr <= 1; dr++) {
@@ -142,7 +146,6 @@ class FlowField {
     final n = math.max(1, (d.length / (cell / 3)).ceil());
     for (var k = 0; k <= n; k++) {
       final p = a + d * (k / n);
-      if (p.y >= StoryLayout.teeLine) break;
       if (p.y >= StoryLayout.spawnTop && blockedAt(p)) return false;
     }
     return true;

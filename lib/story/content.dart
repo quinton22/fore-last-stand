@@ -343,6 +343,9 @@ class StoryEnemy {
     this.spawnable = true,
     this.spawnFromWater = false,
     this.ability,
+    this.description = '',
+    this.counter = '',
+    this.target = false,
   });
 
   factory StoryEnemy.fromJson(Json j) => StoryEnemy(
@@ -361,6 +364,9 @@ class StoryEnemy {
     immuneSlow: j['immuneSlow'] as bool? ?? false,
     spawnable: j['spawnable'] as bool? ?? true,
     spawnFromWater: j['spawn'] == 'water',
+    description: j['description'] as String? ?? '',
+    counter: j['counter'] as String? ?? '',
+    target: j['target'] as bool? ?? false,
     ability: j['ability'] == null ? null : EnemyAbility.fromJson(_m(j['ability'])),
   );
 
@@ -384,6 +390,11 @@ class StoryEnemy {
   final bool spawnable;
   final bool spawnFromWater;
   final EnemyAbility? ability;
+  final String description;
+  final String counter;
+
+  /// Driving Range practice target: never moves or attacks.
+  final bool target;
 }
 
 class BossAbility {
@@ -447,6 +458,7 @@ class StoryTower {
     required this.text,
     required this.overchargeText,
     this.frontRowOnly = false,
+    this.health = 60,
   });
 
   factory StoryTower.fromJson(Json j) => StoryTower(
@@ -461,6 +473,7 @@ class StoryTower {
     text: j['text'] as String? ?? '',
     overchargeText: j['overchargeText'] as String? ?? '',
     frontRowOnly: j['frontRowOnly'] as bool? ?? false,
+    health: _d(j['health'], 60),
   );
 
   final String id;
@@ -474,6 +487,9 @@ class StoryTower {
   final String text;
   final String overchargeText;
   final bool frontRowOnly;
+
+  /// Hit points at level 1; enemies attack towers in their way.
+  final double health;
 
   double stat(String key) => stats[key] ?? 0;
 }

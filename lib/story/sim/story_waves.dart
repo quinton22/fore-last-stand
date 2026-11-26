@@ -43,3 +43,25 @@ List<String> waveRoster(StoryContent c, String courseId, {required int hole, req
 
 /// Total waves in a round: the normal waves plus the boss wave.
 int totalWaves(Rules r, int round) => r.rounds[round - 1].waves + 1;
+
+/// Hole-equivalent difficulty of endless wave [wave] (1-based).
+int endlessHole(int wave) => 1 + (wave - 1) ~/ 2;
+
+/// Enemy ids for endless wave [wave]: a new enemy type joins each wave until
+/// all are in, and the budget grows every wave.
+List<String> endlessRoster(StoryContent c, int seed, {required int wave, int flagsLost = 0}) {
+  final r = c.rules;
+  final rng = math.Random(seed * 7919 + wave);
+  var budget = r.n('waves.budgetBase') * (1 + r.n('arcade.endlessBudgetPerWave') * (wave - 1)) * (1 + r.n('teeBox.budgetPerLostFlag') * flagsLost);
+  final pool = unlockedEnemies(c, wave);
+  final out = <String>[pool.last.id];
+  budget -= pool.last.cost;
+  while (true) {
+    final affordable = pool.where((e) => e.cost <= budget + 1e-9).toList();
+    if (affordable.isEmpty) break;
+    final e = affordable[rng.nextInt(affordable.length)];
+    out.add(e.id);
+    budget -= e.cost;
+  }
+  return out;
+}

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flame/game.dart';
@@ -7,23 +6,32 @@ import 'package:material_ui/material_ui.dart';
 import '../../sim/vec.dart';
 import '../../ui/settings_screen.dart';
 import '../ads.dart';
+import '../arcade.dart';
 import '../content.dart';
 import '../game/round_game.dart';
 import '../progression.dart';
+import '../range_lessons.dart';
 import '../save.dart';
 import '../sim/layout.dart';
 import '../sim/round_sim.dart';
+import 'arcade_results_screen.dart';
+import 'range_ui.dart';
 import 'story_bag_screen.dart';
 import 'story_nav.dart';
 import 'story_results_screen.dart';
 
-/// Prep and the round itself (6a.2 steps 5-6), drawn on the 390 x 844 canvas.
+/// Prep and the round itself, drawn on the 390 x 844 canvas. Story rounds,
+/// Sudden Death, the Daily Tournament and the Driving Range all play here.
 class RoundScreen extends StatefulWidget {
-  const RoundScreen({super.key, required this.deps, required this.courseId, this.replay = false});
+  const RoundScreen({super.key, required this.deps, this.courseId = '', this.replay = false, this.mode = RoundMode.story, this.seed = 0});
 
   final StoryDeps deps;
   final String courseId;
   final bool replay;
+  final RoundMode mode;
+
+  /// Seed for arcade runs (the date for the Daily Tournament).
+  final int seed;
 
   @override
   State<RoundScreen> createState() => _RoundScreenState();
@@ -38,7 +46,7 @@ class _RoundScreenState extends State<RoundScreen> {
   int _draftIndex = 0;
   bool _showDraft = false;
 
-  /// Plot whose build/upgrade sheet is open.
+  /// Plot whose build/upgrade sheet is open (the round is paused meanwhile).
   (int, int)? _sheetPlot;
   bool _paused = false;
   bool _ended = false;
@@ -47,14 +55,18 @@ class _RoundScreenState extends State<RoundScreen> {
   int? _pointer;
   Offset _downAt = Offset.zero;
   (int, int)? _downPlot;
-  bool _onTower = false;
   bool _aimingNow = false;
-  bool _longPressed = false;
-  Timer? _longPress;
+
+  // Driving Range tutorial.
+  int _lesson = 0;
+  bool _guideOpen = true;
+  bool _tips = false;
 
   StoryDeps get deps => widget.deps;
   StoryContent get content => deps.story.content;
   Rules get rules => content.rules;
+  bool get story => widget.mode == RoundMode.story;
+  bool get range => widget.mode == RoundMode.range;
   CourseSave get cs => deps.story.course(widget.courseId);
   HoleRun get run => cs.activeRun(replay: widget.replay);
   CourseContent get course => content.course(widget.courseId);
@@ -63,45 +75,55 @@ class _RoundScreenState extends State<RoundScreen> {
   void initState() {
     super.initState();
     final player = deps.story.save.player;
-    final caddie = player.equippedCaddie;
-    sim = RoundSim(
-      RoundSetup(
-        content: content,
-        courseId: widget.courseId,
-        hole: course.hole(math.min(run.hole, course.holeCount)),
-        round: run.round,
-        coins: run.coins,
-        towers: run.towers,
-        perks: run.perks,
-        roundPerk: run.roundPerk,
-        bag: _bagFromSave(),
-        unlockedTowers: towersFor(content, cs, run.hole),
-        caddieId: caddie,
-        caddieRank: caddie == null ? 1 : player.caddies[caddie] ?? 1,
-        boost: run.bankedBoost,
-        greenskeepingTier: cs.wingTier('greenskeeping'),
-        aimAssist: deps.profile.profile.settings.aimAssist,
-        reviveAvailable: canOfferReward(player, deps.ads),
-      ),
-    );
-    game = RoundGame(sim, deps.profile.profile.settings);
+    final settings = deps.profile.profile.settings;
+    if (story) {
+      final caddie = player.equippedCaddie;
+      sim = RoundSim(
+        RoundSetup(
+          content: content,
+          courseId: widget.courseId,
+          hole: course.hole(math.min(run.hole, course.holeCount)),
+          round: run.round,
+          coins: run.coins,
+          towers: run.towers,
+          perks: run.perks,
+          roundPerk: run.roundPerk,
+          bag: _bagFromSave(),
+          unlockedTowers: towersFor(content, cs, run.hole),
+          caddieId: caddie,
+          caddieRank: caddie == null ? 1 : player.caddies[caddie] ?? 1,
+          boost: run.bankedBoost,
+          greenskeepingTier: cs.wingTier('greenskeeping'),
+          aimAssist: settings.aimAssist,
+          autoCaddie: settings.autoCaddie,
+          reviveAvailable: canOfferReward(player, deps.ads),
+        ),
+      );
+      if (!run.drafted) _offer = perkOffer(content, widget.courseId, run);
+    } else {
+      sim = RoundSim(arcadeSetup(deps.story, settings, widget.mode, seed: widget.seed, reviveAvailable: canOfferReward(player, deps.ads)));
+      if (!range) _offer = arcadePerkOffer(content, widget.seed, const []);
+    }
+    _showDraft = _offer.isNotEmpty;
+    game = RoundGame(sim, settings);
     game.hudTick.addListener(_onTick);
-    if (!run.drafted) {
-      _offer = perkOffer(content, widget.courseId, run);
-      _showDraft = _offer.isNotEmpty;
+    if (range) {
+      sim.teeOff();
+      _guideOpen = true;
     }
     _lifecycle = AppLifecycleListener(onInactive: _autoPause, onHide: _autoPause, onPause: _autoPause);
   }
 
   @override
   void dispose() {
-    _longPress?.cancel();
     _lifecycle.dispose();
     game.hudTick.removeListener(_onTick);
     super.dispose();
   }
 
   List<BagClub?> _bagFromSave() => [for (final id in cs.bag) id == null ? null : BagClub(course.club(id), cs.ownedClubs[id] ?? 1)];
+
+  void _refreeze() => game.frozen = _sheetPlot != null || (_showDraft && sim.playing);
 
   // ---------------------------------------------------------------- flow
 
@@ -110,45 +132,88 @@ class _RoundScreenState extends State<RoundScreen> {
       _ended = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _finish());
     }
+    // Sudden Death: draft a perk every few waves; the round holds still meanwhile.
+    if (sim.draftDue && !_showDraft && sim.phase == RoundPhase.buildBreak) {
+      setState(() {
+        _draftIndex = 0;
+        _offer = arcadePerkOffer(content, widget.seed + sim.wave, sim.perks);
+        _showDraft = _offer.isNotEmpty;
+        if (!_showDraft) sim.draftDue = false;
+        _refreeze();
+      });
+    }
   }
 
+  /// A finished round is saved at once; Results only shows what happened.
   void _finish() {
     if (!mounted) return;
-    deps.story.update((s) => finishRound(s, content, widget.courseId, replay: widget.replay, outcome: sim.outcome()));
+    if (story) {
+      final kills = sim.killsById;
+      late PendingResult pr;
+      late CommitOutcome out;
+      deps.story.update((s) {
+        pr = finishRound(s, content, widget.courseId, replay: widget.replay, outcome: sim.outcome());
+        out = commitResult(s, content, widget.courseId);
+      });
+      deps.profile.update((p) => addKills(p, kills));
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => StoryResultsScreen(deps: deps, courseId: widget.courseId, result: pr, outcome: out),
+        ),
+      );
+      return;
+    }
+    final result = deps.profile.update((p) => recordArcade(p, sim, seed: widget.seed));
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => StoryResultsScreen(deps: deps, courseId: widget.courseId),
+        builder: (_) => ArcadeResultsScreen(deps: deps, result: result, seed: widget.seed),
       ),
     );
   }
 
+  bool get _needsDraft => _offer.isNotEmpty && sim.roundPerk == null && sim.phase == RoundPhase.prep;
+
   void _teeOff() {
-    if (sim.phase != RoundPhase.prep || (_offer.isNotEmpty && sim.roundPerk == null)) return;
-    final extra = math.max(0, _draftIndex - rules.i('perks.freeRerolls'));
-    final coins = sim.coins;
-    final towers = sim.snapshotTowers();
-    deps.story.update(
-      (s) => teeOff(s, widget.courseId, replay: widget.replay, coins: coins, towers: towers, perk: sim.roundPerk, extraRerolls: extra, caddie: sim.caddieId),
-    );
+    if (sim.phase != RoundPhase.prep || _needsDraft) return;
+    if (story) {
+      final extra = math.max(0, _draftIndex - rules.i('perks.freeRerolls'));
+      final coins = sim.coins;
+      final towers = sim.snapshotTowers();
+      deps.story.update(
+        (s) => teeOff(s, widget.courseId, replay: widget.replay, coins: coins, towers: towers, perk: sim.roundPerk, extraRerolls: extra, caddie: sim.caddieId),
+      );
+    }
     setState(() {
       _sheetPlot = null;
       game.selectedPlot = null;
       sim.teeOff();
+      _refreeze();
     });
   }
 
   void _pick(StoryPerk p) => setState(() {
-    sim.pickPerk(p.id);
+    if (sim.phase == RoundPhase.prep) {
+      sim.pickPerk(p.id);
+    } else {
+      sim.addPerk(p.id);
+      sim.draftDue = false;
+    }
     _showDraft = false;
+    _refreeze();
   });
 
-  int get _rerolls => rerollsLeft(rules, cs, run, usedThisDraft: _draftIndex);
+  int get _rerolls {
+    if (story && sim.phase == RoundPhase.prep) return rerollsLeft(rules, cs, run, usedThisDraft: _draftIndex);
+    return math.max(0, rules.i('perks.freeRerolls') - _draftIndex);
+  }
 
   void _reroll() {
     if (_rerolls <= 0) return;
     setState(() {
       _draftIndex++;
-      _offer = perkOffer(content, widget.courseId, run, draft: _draftIndex);
+      _offer = story && sim.phase == RoundPhase.prep
+          ? perkOffer(content, widget.courseId, run, draft: _draftIndex)
+          : arcadePerkOffer(content, widget.seed + sim.wave, sim.perks, draft: _draftIndex);
     });
   }
 
@@ -167,7 +232,7 @@ class _RoundScreenState extends State<RoundScreen> {
       ),
     );
     if (id == null || !mounted) return;
-    deps.story.update((_) => run.bankedBoost = id);
+    if (story) deps.story.update((_) => run.bankedBoost = id);
     setState(() => sim.boost = id);
   }
 
@@ -190,7 +255,7 @@ class _RoundScreenState extends State<RoundScreen> {
   }
 
   void _autoPause() {
-    if (mounted && sim.playing && !_paused) _pause();
+    if (mounted && sim.playing && !_paused && !range) _pause();
   }
 
   void _pause() {
@@ -203,10 +268,16 @@ class _RoundScreenState extends State<RoundScreen> {
     game.resumeEngine();
   }
 
+  /// Story only, and only while a round is being played.
   Future<void> _concede() async {
     if (!await confirmConcede(context) || !mounted) return;
     deps.story.update((s) => concede(s, widget.courseId, replay: widget.replay));
     openHoleMap(context, deps, widget.courseId);
+  }
+
+  void _endRun() {
+    _resume();
+    setState(sim.endRun);
   }
 
   // ---------------------------------------------------------------- input
@@ -214,34 +285,26 @@ class _RoundScreenState extends State<RoundScreen> {
   void _closeSheet() => setState(() {
     _sheetPlot = null;
     game.selectedPlot = null;
+    _refreeze();
   });
 
+  /// Selecting a tower or an empty plot pauses the round until the sheet closes.
   void _openSheet((int, int) plot) => setState(() {
     _sheetPlot = plot;
     game.selectedPlot = plot;
+    _refreeze();
   });
 
-  bool get _inputBlocked => _paused || _showDraft || sim.phase == RoundPhase.revive || sim.finished;
+  bool get _inputBlocked => _paused || _showDraft || sim.phase == RoundPhase.revive || sim.finished || _sheetPlot != null;
 
   void _onDown(PointerDownEvent e) {
     if (_pointer != null || _inputBlocked) return;
     _pointer = e.pointer;
     _downAt = e.localPosition;
-    _longPressed = false;
     _aimingNow = false;
-    final plot = StoryLayout.plotAt(V2(e.localPosition.dx, e.localPosition.dy));
-    _downPlot = plot;
-    _onTower = plot != null && sim.towerAt(plot.$1, plot.$2) != null;
-    if (!sim.playing) return;
-    if (_onTower) {
-      _longPress = Timer(Duration(milliseconds: (rules.n('swing.longPressSeconds') * 1000).round()), () {
-        if (!mounted || _aimingNow || _pointer == null) return;
-        _longPressed = true;
-        _openSheet(plot!);
-      });
-    } else {
-      _startAim();
-    }
+    _downPlot = StoryLayout.plotAt(V2(e.localPosition.dx, e.localPosition.dy));
+    // Off the build zone, aiming starts at once (the Sweet Spot ring runs from touch down).
+    if (sim.playing && _downPlot == null) _startAim();
   }
 
   void _startAim() {
@@ -253,46 +316,27 @@ class _RoundScreenState extends State<RoundScreen> {
   void _onMove(PointerMoveEvent e) {
     if (e.pointer != _pointer) return;
     final d = e.localPosition - _downAt;
-    if (_onTower && !_aimingNow && !_longPressed && sim.playing && d.distance > rules.n('swing.towerDragThreshold')) {
-      _longPress?.cancel();
-      _startAim();
-    }
+    // A touch on the build zone that moves becomes an aim drag.
+    if (!_aimingNow && sim.playing && d.distance > rules.n('swing.towerDragThreshold')) _startAim();
     if (_aimingNow) game.aimDrag = V2(d.dx, d.dy);
   }
 
   void _onUp(PointerUpEvent e) {
     if (e.pointer != _pointer) return;
     _pointer = null;
-    _longPress?.cancel();
     final d = e.localPosition - _downAt;
-    final tap = d.distance <= rules.n('swing.towerDragThreshold');
-    final plot = _downPlot;
     if (_aimingNow) {
       _aimingNow = false;
       game.aimDrag = null;
-      final balls = sim.release(d.dx, d.dy);
-      if (balls.isEmpty && tap) {
-        if (plot != null && sim.towerAt(plot.$1, plot.$2) == null) {
-          _openSheet(plot);
-        } else if (_sheetPlot == null) {
-          setState(() => game.selectedPlot = null);
-        }
-      }
+      sim.release(d.dx, d.dy);
       return;
     }
-    if (_longPressed || !tap || plot == null) return;
-    if (!sim.playing) {
-      _openSheet(plot); // Prep: tap any plot to build, upgrade or sell.
-    } else if (_onTower) {
-      // Tap selects a tower (shows its range); long-press opens upgrade/sell.
-      setState(() => game.selectedPlot = game.selectedPlot == plot ? null : plot);
-    }
+    if (d.distance <= rules.n('swing.towerDragThreshold') && _downPlot != null && sim.canBuild) _openSheet(_downPlot!);
   }
 
   void _onCancel(PointerCancelEvent e) {
     if (e.pointer != _pointer) return;
     _pointer = null;
-    _longPress?.cancel();
     if (_aimingNow) sim.cancelAim();
     _aimingNow = false;
     game.aimDrag = null;
@@ -303,7 +347,7 @@ class _RoundScreenState extends State<RoundScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: sim.phase == RoundPhase.prep,
+      canPop: sim.phase == RoundPhase.prep || range,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && sim.playing && !_paused) _pause();
       },
@@ -325,9 +369,15 @@ class _RoundScreenState extends State<RoundScreen> {
                         right: 0,
                         top: 0,
                         height: StoryLayout.hud.bottom,
-                        child: _Hud(sim: sim, title: _title, onPause: sim.playing ? _pause : null),
+                        child: _Hud(
+                          sim: sim,
+                          title: _title,
+                          onPause: sim.playing && !range ? _pause : null,
+                          onTools: range ? _openTools : null,
+                          onLeave: range ? () => Navigator.of(context).maybePop() : null,
+                        ),
                       ),
-                      if (sim.banner != null)
+                      if (sim.banner != null && !range)
                         Positioned(
                           left: 16,
                           right: 16,
@@ -340,38 +390,41 @@ class _RoundScreenState extends State<RoundScreen> {
                             ),
                           ),
                         ),
-                      if (sim.playing && _sheetPlot == null && game.selectedPlot != null && sim.towerAt(game.selectedPlot!.$1, game.selectedPlot!.$2) != null)
+                      if (range && _guideOpen && _lesson < rangeLessons.length && _sheetPlot == null)
                         Positioned(
-                          left: 8,
-                          right: 8,
-                          top: 124,
-                          child: _SelectedTower(sim: sim, tower: sim.towerAt(game.selectedPlot!.$1, game.selectedPlot!.$2)!),
+                          left: 6,
+                          right: 6,
+                          top: 84,
+                          child: LessonCard(
+                            lesson: rangeLessons[_lesson],
+                            index: _lesson,
+                            total: rangeLessons.length,
+                            done: rangeLessons[_lesson].isDone(sim),
+                            showTips: _tips,
+                            onToggleTips: () => setState(() => _tips = !_tips),
+                            onNext: _nextLesson,
+                            onSkip: _closeGuide,
+                          ),
                         ),
-                      if (sim.phase == RoundPhase.buildBreak && _sheetPlot == null)
+                      if (sim.phase == RoundPhase.buildBreak && _sheetPlot == null && !_showDraft)
                         Positioned(
                           left: 40,
                           right: 40,
-                          top: 490,
+                          top: 446,
                           child: _BreakBar(sim: sim, onSkip: () => setState(sim.skipBreak)),
                         ),
                       if (sim.phase == RoundPhase.prep && !_showDraft && _sheetPlot == null)
-                        Positioned(left: 8, right: 8, bottom: StoryLayout.height - StoryLayout.fairway.bottom + 2, child: _prepPanel()),
+                        Positioned(left: 8, right: 8, bottom: StoryLayout.height - StoryLayout.teeBox.top + 6, child: _prepPanel()),
                       if (_sheetPlot != null)
                         Positioned(
                           left: 8,
                           right: 8,
-                          top: 150,
-                          bottom: StoryLayout.height - StoryLayout.fairway.bottom + 2,
+                          top: 90,
+                          bottom: StoryLayout.height - StoryLayout.teeBox.top + 6,
                           child: Align(alignment: Alignment.bottomCenter, child: _sheet(_sheetPlot!)),
                         ),
                       if (_showDraft)
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          top: StoryLayout.hud.bottom,
-                          bottom: StoryLayout.height - StoryLayout.fairway.bottom,
-                          child: _draftPanel(),
-                        ),
+                        Positioned(left: 0, right: 0, top: StoryLayout.hud.bottom, bottom: StoryLayout.height - StoryLayout.teeBox.top, child: _draftPanel()),
                       Positioned(
                         left: 0,
                         right: 0,
@@ -402,9 +455,14 @@ class _RoundScreenState extends State<RoundScreen> {
     );
   }
 
-  static final ButtonStyle _light = TextButton.styleFrom(foregroundColor: Colors.lightGreenAccent);
+  String get _title => switch (widget.mode) {
+    RoundMode.story => '${widget.replay ? 'Replay · ' : ''}Hole ${sim.holeNumber} · Round ${sim.round}/${rules.roundsPerHole}',
+    RoundMode.endless => 'Sudden Death · ${sim.hole.name}',
+    RoundMode.daily => 'Daily · ${modifierNames[sim.modifier]!.split(':').first}',
+    RoundMode.range => 'Driving Range',
+  };
 
-  String get _title => '${widget.replay ? 'Replay · ' : ''}Hole ${sim.holeNumber} · Round ${sim.round}/${rules.roundsPerHole}';
+  static final ButtonStyle _light = TextButton.styleFrom(foregroundColor: Colors.lightGreenAccent);
 
   Widget _panel({required Widget child, EdgeInsets padding = const EdgeInsets.all(10)}) => Card(
     color: const Color(0xF0263238),
@@ -418,20 +476,24 @@ class _RoundScreenState extends State<RoundScreen> {
     ),
   );
 
+  String get _prepGoal {
+    if (widget.mode == RoundMode.endless) return 'Endless waves, one flag. A mini-boss every 5 waves, a boss every 10, a perk every 3.';
+    final boss = sim.finalBossRound ? 'Final boss: ${content.bossForHole(sim.holeNumber).name}' : 'Mini-boss: Giant ${content.enemy(sim.hole.featured).name}';
+    final daily = widget.mode == RoundMode.daily ? '${modifierNames[sim.modifier]}\n' : '';
+    return '$daily$boss · ${sim.normalWaves} waves first';
+  }
+
   Widget _prepPanel() {
     final player = deps.story.save.player;
     final perk = sim.roundPerk == null ? null : content.perk(sim.roundPerk!);
-    final canBoost = sim.boost == null && canOfferReward(player, deps.ads);
+    final canBoost = story && sim.boost == null && canOfferReward(player, deps.ads);
     return _panel(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('Prep: ${sim.hole.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          Text(
-            '${sim.finalBossRound ? 'Final boss: ${content.bossForHole(sim.holeNumber).name}' : 'Mini-boss: Giant ${content.enemy(sim.hole.featured).name}'} · ${sim.normalWaves} waves first',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
+          Text(_prepGoal, style: const TextStyle(color: Colors.white70, fontSize: 12)),
           const SizedBox(height: 6),
           Text(perk == null ? 'Perk: none' : 'Perk this round: ${perk.name} (${perk.text})'),
           if (sim.perks.length > (perk == null ? 0 : 1))
@@ -459,16 +521,16 @@ class _RoundScreenState extends State<RoundScreen> {
           ),
           if (sim.boost != null) Text('Boost: ${rules.boost(sim.boost!).name}', style: const TextStyle(color: Colors.amberAccent)),
           const SizedBox(height: 4),
-          const Text('Tap a plot on the tee box to build. No timer.', style: TextStyle(color: Colors.white60, fontSize: 12)),
+          const Text('Tap a plot in the build zone to build. Tapping a plot later pauses the round.', style: TextStyle(color: Colors.white60, fontSize: 12)),
           const SizedBox(height: 6),
           Row(
             children: [
               IconButton(
-                tooltip: 'Back to the hole map',
+                tooltip: 'Back',
                 onPressed: () => Navigator.of(context).maybePop(),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
-              TextButton.icon(style: _light, onPressed: _openBag, icon: const Icon(Icons.sports_golf), label: const Text('Bag')),
+              if (story) TextButton.icon(style: _light, onPressed: _openBag, icon: const Icon(Icons.sports_golf), label: const Text('Bag')),
               if (canBoost)
                 TextButton.icon(
                   style: _light,
@@ -477,11 +539,10 @@ class _RoundScreenState extends State<RoundScreen> {
                   label: Text(player.removeAds ? 'Boost' : 'Ad boost'),
                 ),
               const Spacer(),
-              FilledButton(onPressed: _offer.isNotEmpty && sim.roundPerk == null ? null : _teeOff, child: const Text('Tee Off')),
+              FilledButton(onPressed: _needsDraft ? null : _teeOff, child: const Text('Tee Off')),
             ],
           ),
-          if (_offer.isNotEmpty && sim.roundPerk == null)
-            TextButton(style: _light, onPressed: () => setState(() => _showDraft = true), child: const Text('Draft a perk first')),
+          if (_needsDraft) TextButton(style: _light, onPressed: () => setState(() => _showDraft = true), child: const Text('Draft a perk first')),
         ],
       ),
     );
@@ -496,14 +557,14 @@ class _RoundScreenState extends State<RoundScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '${sim.hole.name}: round ${sim.round}',
+            sim.phase == RoundPhase.prep ? '${sim.hole.name}${story ? ': round ${sim.round}' : ''}' : 'Wave ${sim.wave} cleared',
             style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Draft a perk: pick 1 of 3. Perks last for the rest of this hole.',
+          Text(
+            story ? 'Draft a perk: pick 1 of 3. Perks last for the rest of this hole.' : 'Draft a perk: pick 1 of 3. Perks last for the rest of the run.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70),
+            style: const TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 12),
           for (final p in _offer)
@@ -524,9 +585,9 @@ class _RoundScreenState extends State<RoundScreen> {
             ),
           const SizedBox(height: 6),
           TextButton.icon(style: _light, onPressed: _rerolls > 0 ? _reroll : null, icon: const Icon(Icons.refresh), label: Text('Reroll ($_rerolls left)')),
-          if (run.perks.isNotEmpty)
+          if (sim.perks.isNotEmpty)
             Text(
-              'Held: ${run.perks.map((id) => content.perk(id).name).join(', ')}',
+              'Held: ${sim.perks.map((id) => content.perk(id).name).join(', ')}',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white54, fontSize: 12),
             ),
@@ -554,12 +615,13 @@ class _RoundScreenState extends State<RoundScreen> {
                 ),
                 Text('🪙 ${sim.coins}'),
                 IconButton(
+                  tooltip: 'Close',
                   onPressed: _closeSheet,
                   icon: const Icon(Icons.close, color: Colors.white),
                 ),
               ],
             ),
-            if (sim.live) const Text('During a wave: double cost, 2 s slow motion.', style: TextStyle(color: Colors.amberAccent, fontSize: 12)),
+            if (sim.playing) const Text('Paused while you choose.', style: TextStyle(color: Colors.amberAccent, fontSize: 12)),
             if (tower == null) ..._buildOptions(plot) else ..._towerOptions(tower),
           ],
         ),
@@ -583,7 +645,9 @@ class _RoundScreenState extends State<RoundScreen> {
           ),
           title: Text(spec.name, style: TextStyle(color: unlocked ? Colors.white : Colors.white38)),
           subtitle: Text(
-            !unlocked ? 'Unlocks at hole ${spec.unlockHole}' : (!rowOk ? 'Front row only' : '${spec.text}. Overcharge: ${spec.overchargeText}.'),
+            !unlocked
+                ? 'Unlocks at hole ${spec.unlockHole}'
+                : (!rowOk ? 'Front row only' : '${spec.text}. ${spec.health.round()} health. Overcharge: ${spec.overchargeText}.'),
             style: const TextStyle(color: Colors.white60, fontSize: 11),
           ),
           trailing: unlocked
@@ -601,7 +665,8 @@ class _RoundScreenState extends State<RoundScreen> {
     final up = sim.upgradeCost(tower);
     return [
       Text('${tower.spec.text}. Overcharge: ${tower.spec.overchargeText}.', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-      const Text('Each level adds +40% damage or effect strength. Selling refunds 70%.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+      Text('Health ${tower.hp.ceil()}/${tower.maxHp.round()}${tower.active ? '' : ' · disabled'}', style: const TextStyle(fontSize: 12)),
+      const Text('Upgrading adds +40% damage or effect and repairs the tower. Selling refunds 70%.', style: TextStyle(color: Colors.white54, fontSize: 11)),
       const SizedBox(height: 8),
       Row(
         children: [
@@ -645,7 +710,7 @@ class _RoundScreenState extends State<RoundScreen> {
                 const Text('Your last flag fell!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 const Text(
-                  'Revive with 1 flag at full health. Enemies near the tee box are cleared and bosses pushed back. Once per round.',
+                  'Revive with 1 flag at full health. Enemies near the ball are cleared and bosses pushed back. Once per round.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 14),
@@ -654,7 +719,7 @@ class _RoundScreenState extends State<RoundScreen> {
                   icon: const Icon(Icons.ondemand_video),
                   label: Text(player.removeAds ? 'Revive' : 'Watch an ad to revive'),
                 ),
-                TextButton(onPressed: () => setState(sim.declineRevive), child: const Text('Give up')),
+                TextButton(style: _light, onPressed: () => setState(sim.declineRevive), child: const Text('Give up')),
               ],
             ),
           ),
@@ -662,6 +727,19 @@ class _RoundScreenState extends State<RoundScreen> {
       ),
     );
   }
+
+  Widget _pauseButton(String label, VoidCallback onPressed, {bool filled = false}) => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: SizedBox(
+      width: 220,
+      child: filled
+          ? FilledButton(onPressed: onPressed, child: Text(label))
+          : OutlinedButton(
+              onPressed: onPressed,
+              child: Text(label, style: const TextStyle(color: Colors.white)),
+            ),
+    ),
+  );
 
   Widget _pauseOverlay() => Container(
     color: const Color(0xCC000000),
@@ -674,59 +752,72 @@ class _RoundScreenState extends State<RoundScreen> {
           style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
         ),
         Text(_title, style: const TextStyle(color: Colors.white70)),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: 220,
-          child: FilledButton(onPressed: _resume, child: const Text('Resume')),
-        ),
+        const SizedBox(height: 12),
+        _pauseButton('Resume', _resume, filled: true),
+        _pauseButton('Settings', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(store: deps.profile)))),
+        if (story && sim.playing) _pauseButton('Concede', _concede),
+        if (story) _pauseButton('Main Menu', () => goHome(context)) else _pauseButton('End run', _endRun),
         const SizedBox(height: 8),
-        SizedBox(
-          width: 220,
-          child: OutlinedButton(
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(store: deps.profile))),
-            child: const Text('Settings', style: TextStyle(color: Colors.white)),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: 220,
-          child: OutlinedButton(
-            onPressed: _concede,
-            child: const Text('Concede', style: TextStyle(color: Colors.white)),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: 220,
-          child: OutlinedButton(
-            onPressed: () => goHome(context),
-            child: const Text('Main Menu', style: TextStyle(color: Colors.white)),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text('Main Menu restarts this round from Tee Off next time.', style: TextStyle(color: Colors.white54, fontSize: 12)),
+        if (story) const Text('Main Menu restarts this round from Tee Off next time.', style: TextStyle(color: Colors.white54, fontSize: 12)),
       ],
     ),
   );
+
+  // ---------------------------------------------------------------- Driving Range
+
+  void _nextLesson() {
+    if (_lesson + 1 >= rangeLessons.length) return _closeGuide();
+    setState(() {
+      _tips = false;
+      _lesson++;
+      final spawn = rangeLessons[_lesson].spawn;
+      if (spawn != null) sim.spawnTarget(spawn);
+    });
+  }
+
+  void _closeGuide() {
+    setState(() => _guideOpen = false);
+    deps.profile.update((p) {
+      if (!p.tutorialSeen.contains('range')) p.tutorialSeen.add('range');
+    });
+  }
+
+  void _openTools() {
+    showRangeTools(
+      context,
+      sim,
+      onChanged: () => setState(() {}),
+      onReplay: () => setState(() {
+        _lesson = 0;
+        _guideOpen = true;
+        _tips = false;
+      }),
+    );
+  }
 }
 
 class _Hud extends StatelessWidget {
-  const _Hud({required this.sim, required this.title, required this.onPause});
+  const _Hud({required this.sim, required this.title, required this.onPause, this.onTools, this.onLeave});
 
   final RoundSim sim;
   final String title;
   final VoidCallback? onPause;
+  final VoidCallback? onTools;
+  final VoidCallback? onLeave;
 
   String get _waveText => switch (sim.phase) {
     RoundPhase.prep => 'Prep',
     RoundPhase.buildBreak => 'Build break',
+    _ when sim.range => 'Practice',
     _ when sim.isBossWave => sim.finalBossRound ? 'Final boss' : 'Mini-boss',
+    _ when sim.endless => 'Wave ${sim.wave}',
     _ => 'Wave ${sim.wave}/${sim.normalWaves}',
   };
 
   @override
   Widget build(BuildContext context) {
     final hp = (sim.health / sim.maxHealth).clamp(0.0, 1.0);
+    final maxFlags = sim.endless ? 1 : sim.rules.i('teeBox.flags');
     return DefaultTextStyle(
       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
       child: Padding(
@@ -737,17 +828,32 @@ class _Hud extends StatelessWidget {
               children: [
                 Expanded(child: Text(title, overflow: TextOverflow.ellipsis)),
                 Text('🪙 ${sim.coins}'),
-                IconButton(
-                  tooltip: 'Pause',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onPause,
-                  icon: Icon(Icons.pause, color: onPause == null ? Colors.white24 : Colors.white),
-                ),
+                if (onTools != null)
+                  IconButton(
+                    tooltip: 'Range tools',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onTools,
+                    icon: const Icon(Icons.tune, color: Colors.white),
+                  ),
+                if (onLeave != null)
+                  IconButton(
+                    tooltip: 'Leave range',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onLeave,
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  )
+                else
+                  IconButton(
+                    tooltip: 'Pause',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onPause,
+                    icon: Icon(Icons.pause, color: onPause == null ? Colors.white24 : Colors.white),
+                  ),
               ],
             ),
             Row(
               children: [
-                Text('${'🚩' * sim.flags}${'·' * math.max(0, sim.rules.i('teeBox.flags') - sim.flags)}'),
+                Text('${'🚩' * sim.flags}${'·' * math.max(0, maxFlags - sim.flags)}'),
                 const SizedBox(width: 6),
                 Expanded(
                   child: LinearProgressIndicator(
@@ -876,7 +982,7 @@ class _BarButton extends StatelessWidget {
                 child: FractionallySizedBox(
                   alignment: Alignment.centerLeft,
                   widthFactor: fill.clamp(0.0, 1.0),
-                  child: Container(color: Colors.white70),
+                  child: const ColoredBox(color: Colors.white70),
                 ),
               ),
               Center(
@@ -919,28 +1025,6 @@ class _BreakBar extends StatelessWidget {
           ),
           FilledButton(onPressed: onSkip, child: const Text('Skip')),
         ],
-      ),
-    ),
-  );
-}
-
-class _SelectedTower extends StatelessWidget {
-  const _SelectedTower({required this.sim, required this.tower});
-
-  final RoundSim sim;
-  final STower tower;
-
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-    child: Card(
-      color: const Color(0xDD263238),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Text(
-          '${tower.spec.name} · level ${tower.level}${tower.active ? '' : ' · disabled'}\nHold the tower to upgrade or sell.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white, fontSize: 12),
-        ),
       ),
     ),
   );

@@ -75,6 +75,10 @@ class StoryStore extends ChangeNotifier {
     for (final id in save.unlockedCourses) {
       if (content.courseContent.containsKey(id)) courseSave(save, content, id);
     }
+    // Rounds are saved the moment they end; apply any result an older build left pending.
+    for (final id in save.courses.keys.toList()) {
+      if (save.courses[id]!.pendingResult != null && content.courseContent.containsKey(id)) commitResult(save, content, id);
+    }
   }
 
   final StoryContent content;

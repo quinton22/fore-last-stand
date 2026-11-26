@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:flame/game.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fore_last_stand/main.dart';
 import 'package:fore_last_stand/meta/profile.dart';
@@ -7,7 +6,14 @@ import 'package:fore_last_stand/meta/profile_store.dart';
 import 'package:fore_last_stand/story/content.dart';
 import 'package:fore_last_stand/story/progression.dart';
 import 'package:fore_last_stand/story/save.dart';
+import 'package:fore_last_stand/story/arcade.dart';
+import 'package:fore_last_stand/story/game/round_game.dart';
+import 'package:fore_last_stand/story/sim/layout.dart';
+import 'package:fore_last_stand/story/sim/round_sim.dart';
 import 'package:fore_last_stand/story/story_store.dart';
+import 'package:fore_last_stand/story/ui/round_screen.dart';
+import 'package:fore_last_stand/story/ui/story_nav.dart';
+import 'package:fore_last_stand/story/ui/story_results_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'helpers.dart';
@@ -64,64 +70,74 @@ void main() {
     expect(find.textContaining('Suburban Muni: Hole 1, round 1'), findsOneWidget);
   });
 
-  testWidgets('the app reopens on a pending Results screen; Concede voids it', (tester) async {
+  testWidgets('Results: saved at once, no Concede; Next Round opens Prep for round 2', (tester) async {
     await tester.binding.setSurfaceSize(const Size(420, 1000));
     final save = freshSave(content);
-    finishRound(
+    final story = StoryStore(content, save, MemorySaveBackend());
+    final deps = StoryDeps(
+      profile: ProfileStore(Profile(tutorialSeen: ['welcome'])),
+      story: story,
+    );
+    final pr = finishRound(
       save,
       content,
       muni,
       replay: false,
       outcome: const RoundOutcome(won: true, wavesCleared: 4, totalWaves: 4, flagsLeft: 2, endCoins: 300, endTowers: []),
     );
-    final story = StoryStore(content, StorySave.fromJson((jsonDecode(jsonEncode(save.toJson())) as Map).cast<String, Object?>()), MemorySaveBackend());
+    final out = commitResult(save, content, muni);
     await tester.pumpWidget(
-      ForeApp(
-        store: ProfileStore(Profile(tutorialSeen: ['welcome'])),
-        story: story,
+      MaterialApp(
+        home: StoryResultsScreen(deps: deps, courseId: muni, result: pr, outcome: out),
       ),
     );
     await settle(tester);
     expect(find.text('Round 1 won!'), findsOneWidget);
-    expect(find.text('Next Round'), findsOneWidget);
     expect(find.text('+110'), findsOneWidget);
     expect(find.text('Rank 2 on Suburban Muni!'), findsOneWidget);
-    await tester.tap(find.text('Concede'));
-    await settle(tester);
-    await tester.tap(find.widgetWithText(FilledButton, 'Concede'));
-    await settle(tester);
+    expect(find.text('Concede'), findsNothing);
+    expect(find.text('Story Menu'), findsOneWidget);
     final cs = story.course(muni);
-    expect(cs.pendingResult, isNull);
-    expect(cs.rank, 1);
-    expect(cs.current.round, 1);
-    expect(find.text('Rank 1'), findsOneWidget, reason: 'back on the hole map');
+    expect(cs.rank, 2, reason: 'already saved');
+    expect(cs.current.round, 2);
+    expect(cs.current.coins, 300);
+    await tester.tap(find.text('Next Round'));
+    await settle(tester);
+    expect(find.textContaining('round 2'), findsWidgets);
   });
 
-  testWidgets('Next Round commits the result and opens Prep for round 2', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(420, 1000));
-    final save = freshSave(content);
-    finishRound(
-      save,
-      content,
-      muni,
-      replay: false,
-      outcome: const RoundOutcome(won: true, wavesCleared: 4, totalWaves: 4, flagsLeft: 2, endCoins: 300, endTowers: []),
+  testWidgets('Pause offers Concede only during a round', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(420, 900));
+    final story = StoryStore(content, freshSave(content), MemorySaveBackend());
+    final deps = StoryDeps(
+      profile: ProfileStore(Profile(tutorialSeen: ['welcome'])),
+      story: story,
     );
-    final story = StoryStore(content, save, MemorySaveBackend());
     await tester.pumpWidget(
-      ForeApp(
-        store: ProfileStore(Profile(tutorialSeen: ['welcome'])),
-        story: story,
+      MaterialApp(
+        home: RoundScreen(deps: deps, mode: RoundMode.endless, seed: 3),
       ),
     );
     await settle(tester);
-    await tester.tap(find.text('Next Round'));
+    await tester.tap(find.text(arcadePerkOffer(content, 3, const []).first.name));
     await settle(tester);
-    final cs = story.course(muni);
-    expect(cs.rank, 2);
-    expect(cs.current.round, 2);
-    expect(cs.current.coins, 300);
-    expect(find.textContaining('round 2'), findsWidgets);
+    await tester.tap(find.text('Tee Off'));
+    await settle(tester);
+    // Tapping a plot mid-round opens the build sheet and pauses the round.
+    final box = tester.getRect(find.byType(GameWidget<RoundGame>));
+    final scale = box.width / StoryLayout.width;
+    final plot = StoryLayout.plotCenter(0, 0);
+    await tester.tapAt(box.topLeft + Offset(plot.x * scale, plot.y * scale));
+    await settle(tester);
+    expect(find.text('Paused while you choose.'), findsOneWidget);
+    expect(tester.widget<GameWidget<RoundGame>>(find.byType(GameWidget<RoundGame>)).game!.frozen, isTrue);
+    await tester.tap(find.byTooltip('Close'));
+    await settle(tester);
+    expect(tester.widget<GameWidget<RoundGame>>(find.byType(GameWidget<RoundGame>)).game!.frozen, isFalse);
+    await tester.tap(find.byTooltip('Pause'));
+    await settle(tester);
+    expect(find.text('Concede'), findsNothing, reason: 'arcade runs end instead');
+    expect(find.text('End run'), findsOneWidget);
   });
 
   testWidgets('Pro Shop buys a revealed club and the Bag equips it', (tester) async {
