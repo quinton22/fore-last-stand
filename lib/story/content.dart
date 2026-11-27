@@ -346,6 +346,7 @@ class StoryEnemy {
     this.description = '',
     this.counter = '',
     this.target = false,
+    this.path = 'direct',
   });
 
   factory StoryEnemy.fromJson(Json j) => StoryEnemy(
@@ -367,6 +368,7 @@ class StoryEnemy {
     description: j['description'] as String? ?? '',
     counter: j['counter'] as String? ?? '',
     target: j['target'] as bool? ?? false,
+    path: j['path'] as String? ?? 'direct',
     ability: j['ability'] == null ? null : EnemyAbility.fromJson(_m(j['ability'])),
   );
 
@@ -395,6 +397,11 @@ class StoryEnemy {
 
   /// Driving Range practice target: never moves or attacks.
   final bool target;
+
+  /// How it crosses the fairway: direct (shortest path to the ball), spread
+  /// (to a random point along the build zone), flank (down a side edge),
+  /// weave (zigzag) or follow (stays beside its pack leader).
+  final String path;
 }
 
 class BossAbility {

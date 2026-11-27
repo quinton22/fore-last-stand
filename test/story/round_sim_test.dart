@@ -74,6 +74,7 @@ void main() {
     s.enemies.clear();
     final goose = s.spawnEnemy('goose', at: const V2(195, 420));
     goose.abilityTimer = 99;
+    goose.snareTimer = 99; // hold it in the ball's path
     s.beginAim();
     s.release(0, 120);
     runUntil(s, () => s.balls.isEmpty, seconds: 2);

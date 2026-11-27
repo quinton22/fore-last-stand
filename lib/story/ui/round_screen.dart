@@ -433,7 +433,12 @@ class _RoundScreenState extends State<RoundScreen> {
                         right: 0,
                         top: StoryLayout.clubBar.top,
                         bottom: 0,
-                        child: _ClubBar(sim: sim, leftHanded: deps.profile.profile.settings.leftHanded, onChanged: () => setState(() {})),
+                        child: _ClubBar(
+                          sim: sim,
+                          leftHanded: deps.profile.profile.settings.leftHanded,
+                          onChanged: () => setState(() {}),
+                          onBag: range ? _openRangeBag : null,
+                        ),
                       ),
                       if (sim.phase == RoundPhase.revive) Positioned.fill(child: _reviveOverlay()),
                       if (_paused) Positioned.fill(child: _pauseOverlay()),
@@ -785,6 +790,46 @@ class _RoundScreenState extends State<RoundScreen> {
     });
   }
 
+  /// Driving Range bag: every club on the course, picked from a list.
+  void _openRangeBag() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (c) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(c).size.height * 0.7,
+          child: ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              Text('Bag', style: Theme.of(c).textTheme.titleLarge),
+              const Text('Every club on the course is free to try on the range. Tap one to use it.'),
+              const SizedBox(height: 8),
+              for (var i = 0; i < sim.bag.length; i++)
+                if (sim.bag[i] != null)
+                  () {
+                    final club = sim.bag[i]!.club;
+                    return Card(
+                      color: sim.selectedSlot == i ? Colors.lightGreen.shade100 : null,
+                      child: ListTile(
+                        title: Text(club.name),
+                        subtitle: Text(
+                          '${club.tierName} ${club.family.name} · ${club.family.behavior}${club.effectText.isEmpty ? '' : '\n${club.effectText}'}',
+                        ),
+                        trailing: sim.selectedSlot == i ? const Icon(Icons.check_circle, color: Colors.green) : null,
+                        onTap: () {
+                          setState(() => sim.selectSlot(i));
+                          Navigator.of(c).pop();
+                        },
+                      ),
+                    );
+                  }(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _openTools() {
     showRangeTools(
       context,
@@ -890,17 +935,34 @@ class _Hud extends StatelessWidget {
 }
 
 class _ClubBar extends StatelessWidget {
-  const _ClubBar({required this.sim, required this.leftHanded, required this.onChanged});
+  const _ClubBar({required this.sim, required this.leftHanded, required this.onChanged, this.onBag});
 
   final RoundSim sim;
   final bool leftHanded;
   final VoidCallback onChanged;
 
+  /// Driving Range: one club button plus a Bag button that opens the club list.
+  final VoidCallback? onBag;
+
   @override
   Widget build(BuildContext context) {
     final caddie = sim.caddie;
     final children = <Widget>[
-      for (var i = 0; i < sim.bag.length; i++) Expanded(flex: 4, child: _clubButton(i)),
+      if (onBag != null) ...[
+        Expanded(flex: 6, child: _clubButton(sim.selectedSlot, onTap: onBag)),
+        Expanded(
+          flex: 3,
+          child: _BarButton(
+            label: 'Bag',
+            sub: '${sim.bag.whereType<BagClub>().length} clubs',
+            color: const Color(0xFF5D4037),
+            fill: 1,
+            enabled: true,
+            onTap: onBag,
+          ),
+        ),
+      ] else
+        for (var i = 0; i < sim.bag.length; i++) Expanded(flex: 4, child: _clubButton(i)),
       Expanded(
         flex: 3,
         child: _BarButton(
@@ -934,7 +996,7 @@ class _ClubBar extends StatelessWidget {
     );
   }
 
-  Widget _clubButton(int i) {
+  Widget _clubButton(int i, {VoidCallback? onTap}) {
     final b = sim.bag[i];
     if (b == null) return const _BarButton(label: '—', color: Colors.black26, fill: 0, enabled: false);
     final s = sim.statsFor(b);
@@ -946,10 +1008,12 @@ class _ClubBar extends StatelessWidget {
       fill: s.cooldown == 0 ? 1 : 1 - cd / s.cooldown,
       enabled: true,
       selected: sim.selectedSlot == i,
-      onTap: () {
-        sim.selectSlot(i);
-        onChanged();
-      },
+      onTap:
+          onTap ??
+          () {
+            sim.selectSlot(i);
+            onChanged();
+          },
     );
   }
 }

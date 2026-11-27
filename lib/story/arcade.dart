@@ -33,12 +33,13 @@ StoryHole arcadeHole(StoryContent content, String courseId, int seed) {
 /// A flat practice hole for the Driving Range.
 const StoryHole rangeHole = StoryHole(number: 1, name: 'Driving Range', featured: 'goose', hazards: Hazards());
 
-/// One starter club of each family, for trying them all on the range.
+/// Every club on the course, grouped by family, to try on the range.
 List<BagClub?> rangeBag(CourseContent course) {
-  final seen = <String>{};
+  final families = <String>{for (final c in course.clubs) c.family.id}.toList();
   return [
-    for (final c in course.clubs)
-      if (seen.add(c.family.id)) BagClub(c, 1),
+    for (final f in families)
+      for (final c in course.clubs)
+        if (c.family.id == f) BagClub(c, 1),
   ];
 }
 

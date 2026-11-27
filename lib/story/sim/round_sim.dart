@@ -185,6 +185,15 @@ class SEnemy {
   /// True while standing at the ball attacking it.
   bool atBall = false;
 
+  /// Path state: the x it heads for above the build zone (spread, flank),
+  /// whether it got there, a detour timer when the straight line is blocked,
+  /// a zigzag phase (weave) and its place beside the leader (follow).
+  double? laneX;
+  bool laneDone = false;
+  double detour = 0;
+  double phase = 0;
+  V2 followOffset = V2.zero;
+
   double pauseTimer = 0;
   double chargeCooldown = 0;
   V2? chargeDir;
@@ -553,9 +562,15 @@ class RoundSim {
     return minPower + (1 - minPower) * t;
   }
 
+  /// The enemy aim assist leans toward, chosen when the drag starts so the
+  /// aim doesn't hop between enemies mid-drag.
+  SEnemy? _assistTarget;
+
   void beginAim() {
     aiming = true;
     aimTime = 0;
+    final s = currentStats;
+    _assistTarget = s == null ? null : _nearest(StoryLayout.golfer, (e) => _hittable(s, e));
   }
 
   void cancelAim() => aiming = false;
@@ -564,7 +579,8 @@ class RoundSim {
 
   V2 _assisted(V2 dir, ClubStats s) {
     if (setup.aimAssist <= 0) return dir;
-    final target = _nearest(StoryLayout.golfer, (e) => _hittable(s, e));
+    final locked = _assistTarget;
+    final target = locked != null && _hittable(s, locked) ? locked : _nearest(StoryLayout.golfer, (e) => _hittable(s, e));
     return target == null ? dir : assistAim(dir, target.pos - StoryLayout.golfer, setup.aimAssist);
   }
 
@@ -1259,6 +1275,7 @@ class RoundSim {
       leader: leader,
     );
     e.abilityTimer = spec.ability?.every ?? 0;
+    _assignPath(e, at);
     enemies.add(e);
     final a = spec.ability;
     if (a != null && a.type == 'pack' && a.follower != null) {
@@ -1482,7 +1499,7 @@ class RoundSim {
       if (type == 'charge') {
         _moveBoar(e, speed, dt);
       } else {
-        e.pos = e.pos + flow.direction(e.pos) * (speed * dt);
+        _walk(e, speed, dt);
       }
     }
     if (e.pos.distanceTo(StoryLayout.golfer) <= e.radius + StoryLayout.ballReach) {
@@ -1490,6 +1507,71 @@ class RoundSim {
       e.chargeDir = null;
       _reachBall(e);
     }
+  }
+
+  /// Height above the build zone where lane-walkers turn toward the ball.
+  static const double _laneGap = 40;
+
+  void _assignPath(SEnemy e, V2? at) {
+    e.phase = rng.nextDouble() * math.pi * 2;
+    const zone = StoryLayout.teeBox;
+    switch (e.spec.path) {
+      case 'spread':
+        e.laneX = zone.left + 12 + rng.nextDouble() * (zone.width - 24);
+      case 'flank':
+        // The edge it entered nearest, or a random one from the top.
+        final left = e.pos.x < StoryLayout.width / 2 - 40 || (e.pos.x <= StoryLayout.width / 2 + 40 && rng.nextBool());
+        e.laneX = left ? e.radius + 8 : StoryLayout.width - e.radius - 8;
+      case 'follow':
+        final leader = e.leader;
+        if (leader != null) e.followOffset = e.pos - leader.pos;
+    }
+  }
+
+  /// One step along the enemy's path. Lane-walkers head straight for their
+  /// lane point above the build zone (falling back to the flow field around
+  /// hazards), then take the flow field to the ball.
+  void _walk(SEnemy e, double speed, double dt) {
+    final stepLen = speed * dt;
+    var dir = flow.direction(e.pos);
+    e.detour = math.max(0, e.detour - dt);
+    final leader = e.leader;
+    if (e.spec.path == 'follow' && leader != null && leader.alive && !leader.atBall && leader.attacking == null) {
+      final spot = leader.pos + e.followOffset;
+      final to = spot - e.pos;
+      if (to.length > 2) {
+        final want = to.normalized();
+        if (!_blockedAhead(e, want)) dir = want;
+      }
+    } else if (e.laneX != null && !e.laneDone) {
+      final laneY = StoryLayout.teeBox.top - _laneGap;
+      // Flankers get out to their edge first, then run down it.
+      final toEdge = e.spec.path == 'flank' && (e.pos.x - e.laneX!).abs() > 8;
+      final target = toEdge ? V2(e.laneX!, math.min(e.pos.y + 30, laneY)) : V2(e.laneX!, laneY);
+      if (e.pos.y >= laneY - 4 || (!toEdge && e.pos.distanceTo(target) < 10)) {
+        e.laneDone = true;
+      } else if (e.detour <= 0) {
+        final want = (target - e.pos).normalized();
+        if (_blockedAhead(e, want)) {
+          e.detour = 1.2;
+        } else {
+          dir = want;
+        }
+      }
+    }
+    if (e.spec.path == 'weave' && e.pos.y < StoryLayout.teeBox.top - _laneGap) {
+      final side = V2(-dir.y, dir.x) * (math.sin(e.age * 3 + e.phase) * 0.8);
+      final want = (dir + side).normalized();
+      if (!_blockedAhead(e, want)) dir = want;
+    }
+    final next = e.pos + dir * stepLen;
+    e.pos = V2(next.x.clamp(e.radius, StoryLayout.width - e.radius).toDouble(), next.y);
+  }
+
+  /// True if walking along [dir] would put the enemy in a hazard.
+  bool _blockedAhead(SEnemy e, V2 dir) {
+    final probe = e.pos + dir * (e.radius + 6);
+    return probe.y >= StoryLayout.spawnTop && (flow.blockedAt(probe) || !flow.reachable(probe));
   }
 
   void _step(SEnemy e, V2 to, double speed, double dt) {

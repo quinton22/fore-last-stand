@@ -76,6 +76,17 @@ void main() {
     expect(find.textContaining('Lesson'), findsNothing);
     expect(store.profile.tutorialSeen, contains('range'));
     expect(find.byTooltip('Range tools'), findsOneWidget);
+    // The range has a Bag button instead of a row of clubs.
+    await tester.tap(find.text('Bag'));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    await tester.scrollUntilVisible(find.text('The Foghorn'), 200, scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text('The Foghorn'));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    expect(find.text('The Foghorn'), findsOneWidget, reason: 'now the selected club on the bar');
   });
 
   testWidgets('the bestiary describes every animal before you meet it', (tester) async {

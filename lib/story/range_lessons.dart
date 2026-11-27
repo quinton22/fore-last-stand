@@ -51,17 +51,17 @@ final List<RangeLesson> rangeLessons = [
   ),
   RangeLesson(
     title: 'Clubs',
-    body: 'Tap a club at the bottom to switch. Each family plays differently, and each keeps its own cooldown.',
+    body: 'Tap Bag at the bottom to pick a club from the list. Each family plays differently, and each club keeps its own cooldown.',
     tips: const [
       'Iron: bounces twice and hits fliers.',
       'Fairway Wood: pierces one enemy and bounces once.',
       'Driver: fast and straight, pierces three, hits fliers.',
       'Wedge: lobs over everything and lands as a blast.',
       'Putter: a ground roll that hits up to 10 enemies but misses fliers.',
-      'In Story Mode your bag holds 3 clubs, one per family. Here you get one of each.',
+      'In Story Mode your bag holds 3 clubs, one per family. On the range every club on the course is in the Bag, Specials included.',
     ],
-    goal: 'Swing every club once',
-    done: (s) => s.familiesSwung.length >= s.bag.whereType<BagClub>().length,
+    goal: 'Swing a club from every family',
+    done: (s) => s.familiesSwung.length >= s.bag.whereType<BagClub>().map((b) => b.club.family.id).toSet().length,
   ),
   RangeLesson(
     title: 'Fliers',
