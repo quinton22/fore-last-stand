@@ -8,34 +8,41 @@ One-thumb, portrait golf tower-defense. A virus has overrun the golf course with
 
 Playable MVP of the [feature spec](https://claude.ai/code/artifact/f2b2c67e-0ef5-49d5-abc2-055c1d0f03cb) (section 12 scope). Shapes stand in for art and text for the commentator's voice.
 
-**In the build**
+**Story Mode** (spec section 6a, MVP: Suburban Muni holes 1-9)
 
-- **Swing:** drag back anywhere, release on the timing ring's green zone for a Sweet Spot (+50% damage, +1 pierce, screen shake). Dotted preview of the first wall bounce, ~0.8 s cooldown, aim-assist slider.
-- **Depth:** balls ricochet off walls and enemies but pass through your own towers; flags occasionally pop up on the course and sinking a ball in one overcharges every tower (tap a tower to upgrade or sell), combo ladder Bogey → Albatross (coin multiplier, Fore! meter), 3-second Fore! barrage.
-- **Clubs:** Driver (pierce 3), Iron (2 bounces), Wedge (lob + blast), Putter (ground roll, unlocked in the Bag). 3-club bag, tap to swap.
-- **Towers (6):** Range Ball Machine, Sprinkler, Tee-Tesla, Lawnmower Ripper, Cart Cannon, Caddie Sniper on a 4x4 plot grid (5x5/6x6 via Clubhouse). Build between holes, or live at double cost with 2 s slow-mo. Sell for 70%, free re-placement in the first 10 s. Sprinkler + Tee-Tesla pair bonus; 3 tower levels.
-- **Enemies (8) + boss:** Goose (honk stuns towers), Gator (surfaces from water), Raccoon (steals coins), Crow (flier, dives towers), Boar (charges, ignores slows), Squirrel Bomber, Skunk (gas disables towers), Coyote Pack (leader buffs pups), Goose King boss (summons flocks).
-- **Holes:** Suburban Muni, 9 holes with par times, breathers on 3 and 6, boss on 9. Clubhouse has 3 flags; a fallen flag repairs 30% and grows swarms.
-- **Modes:** Quick Round (5 holes, mini-boss), Full Round (9 holes), Sudden Death (endless, one flag), Daily Tournament (date seed + daily modifier, local best score).
-- **Run layer:** 20 Mulligan-card perks in 4 rarities and 3 sets (set bonus), 1 of 3 draft after every hole, one free reroll.
-- **Caddies (2):** Big Earl (Fore! +40%, Big Drive), Dottie (+20% vs bosses, Mark & Snipe). First caddie free after the first round.
-- **Meta (saved locally):** coins, Club Tokens, XP; club levels 1-20 with traits; Clubhouse upgrades (grid, starting coins, walls); bestiary; "three nearest unlocks" on results and home. Clubhouse unlocks after 2 rounds, Bag after 3.
-- **First-time experience:** first round is scripted with hints; hidden adaptive difficulty (about 10% fewer enemies after 2 losses in a row).
-- **Settings:** aim assist, Auto-Caddie (swings for you at 60% damage), left-handed layout, screen shake, Gore (Full Splat / Classic / Squeaky Clean).
+- **Structure:** holes in order, 3 rounds each (3/4/5 timed waves, then a mini-boss in rounds 1-2 and a final boss in round 3). Coins, towers and perks carry between the rounds of a hole; a new hole starts with 150 coins and an empty build zone. Beating hole 9 shows Course Complete. Beaten holes can be replayed for half XP and tokens.
+- **Screens:** Main menu → course select (locked courses greyed) → hole map (Play, Bag, Pro Shop, Clubhouse, Caddies) → Prep (draft 1 of 3 perks, place towers, pick a caddie, optional ad boost, Tee Off) → round (8 s build breaks with Skip; pause: Resume, Settings, Concede, Main Menu) → Results.
+- **Saving:** a round is saved the moment it ends; Results then offers Continue (Next Round, Next Hole, Retry Round or Finish Course) or the Story Menu. Concede is only in the pause menu during a round: it voids the round and puts coins, towers and the perk pick back to Tee Off.
+- **Layout:** a 390 x 844 canvas, letterboxed: HUD, fairway with hazards (water, fences, sand, trees), the build zone, then the golfer and ball near the bottom at (195, 768), then the club bar. Enemies enter on the top edge or the upper third of the side edges. Club ranges are tuned so a full-power driver reaches the top of the fairway. Drag anywhere to aim (24-120 units maps to 35-100% power; aim assist eases in and out so the aim never jumps), shrinking Sweet Spot ring, per-club cooldowns, combo ladder, Fore! burst.
+- **Combat:** enemies follow a flow field around hazards toward the ball, each type on its own route: geese and skunks spread across the build zone, raccoons and coyotes flank down a side edge, squirrels zigzag, gators and boars come straight in, and coyote followers keep beside their leader. Ground enemies stop to attack any tower in their way until it is destroyed; anything that reaches the ball stays there attacking it (bosses too). Towers have health: upgrading repairs them, a destroyed tower is lost. Losing all flags loses the round.
+- **Build zone:** 6 plots wide by 2 deep to start, in every mode. Each Grounds Crew tier in the Clubhouse opens one more plot in a third, front row (closest to the fairway), from the middle outward, up to 6; the arcade modes use the Story course's tier.
+- **Building:** towers cost the same in Prep, build breaks and mid-wave. Tapping a plot or a tower opens its sheet and pauses the round until it closes; dragging from a plot still aims.
+- **Per-course rank and clubs:** rank 1-18 from XP; each rank-up reveals one club in the Pro Shop, bought and levelled (1-5) with that course's Club Tokens. 3-slot bag, one club per family (Iron, Fairway Wood, Driver, Wedge, Putter), 18 clubs including 6 Specials.
+- **Content:** 8 enemies with abilities, 4 final bosses, 8 towers, 20 perks, Big Earl and Dottie with ranks paid in Caddie Badges, Clubhouse wings (Snack Bar, Greenskeeping, Locker Room, Grounds Crew).
+- **Data:** everything is JSON in `assets/courses/`; the number of playable holes is the length of `holes.json`. The save is one JSON file written to a temp file and renamed.
+- **Rewarded ads:** revive and one boost per round. No ad SDK is wired up yet, so the buttons stay hidden; Settings → *Test ads* turns on a 3-second stand-in to try the flow.
 
-**Not built yet** (needs a backend, store setup or art): rewarded ads, IAP, Season Pass, Gems shop, leaderboards, Weekly Invitational, notifications, share clips, voiced commentary, Tour Ranks/prestige, other courses, mid-run save, real art and audio.
+**Arcade modes** (same engine, layout, enemies and towers as Story; they use your Story bag and caddie)
+
+- **Sudden Death:** endless waves on a random Suburban Muni layout with one flag. A new enemy type joins each wave, a mini-boss every 5 waves, a final boss every 10, a perk draft every 3. Best wave count is saved.
+- **Daily Tournament:** everyone gets the same hole, seed and modifier for the day (windy, big balls, stampede, cheap seats, glass tee): 5 waves then a final boss. Best score of the day is saved.
+- **Driving Range:** a guided tutorial on the Story engine, then free practice with every club on the course (picked from a Bag button), free coins, practice targets and Range tools (spawn targets or live animals, put up a flag, try perks).
+
+**Shared:** bestiary of every animal and boss, settings (aim assist, Auto-Caddie, left-handed layout, screen shake, gore level, test ads).
+
+**Not built yet** (needs a backend, store setup or art): a real rewarded-ad SDK, IAP (including Remove Ads), Season Pass, Gems shop, leaderboards, Weekly Invitational, notifications, share clips, voiced commentary, Tour Ranks/prestige, Story holes 10-18 and courses 2-3, real art and audio.
 
 ## Code layout
 
 | Path | What |
 |---|---|
-| `lib/data/` | All content as plain data: clubs, enemies, towers, perks, caddies, courses/holes, modes, commentary |
-| `lib/sim/` | Pure-Dart simulation (`Battle`), wave scheduling, combo, swing math. No Flame imports, fully unit-tested |
-| `lib/game/fore_game.dart` | Flame game: runs the sim loop and draws it |
-| `lib/meta/` | Profile, persistence (`shared_preferences`), rewards and upgrade rules |
-| `lib/ui/` | Flutter screens: home, run HUD/draft/build sheet, results, Bag, Clubhouse, Caddies, Bestiary, Settings |
+| `lib/sim/` | Small shared math: vectors and aim assist |
+| `lib/meta/` | Profile (settings, bestiary, arcade records) and its persistence (`shared_preferences`) |
+| `lib/ui/` | Main menu, Bestiary, Settings |
+| `assets/courses/` | Story Mode content as JSON: shared `rules.json`, `enemies.json`, `bosses.json`, `towers.json`, `perks.json`, `caddies.json`, `club_families.json`, plus `<courseId>/clubs.json` and `holes.json` |
+| `lib/story/` | The game: content parsing, Story save and store, progression rules (`progression.dart`), arcade setups (`arcade.dart`), Driving Range lessons, round sim and flow field (`sim/`), Flame renderer (`game/`), screens (`ui/`) |
 
-New content is usually a data entry: add an enemy to `enemies.dart` and reference it from a hole in `courses.dart`.
+All content is JSON: add a hole to `assets/courses/<courseId>/holes.json` and it becomes playable in Story and the arcade modes.
 
 ## Design summary
 
@@ -43,11 +50,11 @@ New content is usually a data entry: add an enemy to `enemies.dart` and referenc
 - **Loop:** moment (2-10 s) → hole/wave (30-90 s) → round (3-15 min) → meta (clubs, caddies, clubhouse).
 - **Swing:** drag back to aim/power, release on the timing ring for a Sweet Spot (+50% damage); ~0.8 s cooldown; Fore! burst when the meter is full.
 - **Clubs:** Driver (pierce), Iron (bounces), Wedge (blast), Putter (ground roll).
-- **Towers:** on a 4x4 plot grid around the clubhouse (grows to 6x6); pairs unlock bonuses.
-- **Modes:** Quick Round, Full Round, Sudden Death, Daily Tournament, Weekly Invitational.
+- **Towers:** on a 6x2 build zone in front of the ball that grows a front row one plot at a time.
+- **Modes:** Story Mode, Sudden Death, Daily Tournament, Weekly Invitational.
 - **Meta:** club/tower levels, caddies, clubhouse wings, bestiary, Tour Rank prestige.
 - **Monetization:** F2P, opt-in rewarded ads, cosmetic-first IAP, no interstitials during a run.
-- **MVP:** 1 course (9 holes), 6 towers, 8 enemies, 1 boss, 3 clubs, 2 caddies, 20 perks, Quick Round + Sudden Death.
+- **MVP:** Story Mode on 1 course (holes 1-9), 8 towers, 8 enemies, 4 bosses, 18 clubs, 2 caddies, 20 perks, plus Sudden Death and the Daily Tournament.
 
 ## Develop
 

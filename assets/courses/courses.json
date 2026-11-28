@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "courses": [
+    {"id": "suburban_muni", "name": "Suburban Muni", "description": "Ponds, picket fences and a lot of angry geese.", "available": true},
+    {"id": "course_2", "name": "Course 2", "description": "Not designed yet.", "available": false},
+    {"id": "course_3", "name": "Course 3", "description": "Not designed yet.", "available": false}
+  ]
+}

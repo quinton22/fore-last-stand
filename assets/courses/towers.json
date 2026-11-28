@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "towers": [
+    {"id": "range", "name": "Range Ball Machine", "badge": "RB", "kind": "ballMachine", "cost": 50, "unlockHole": 1, "color": "0xFF1E88E5", "stats": {"damage": 4, "interval": 0.3333, "range": 200}, "text": "4 damage, 3 shots/s, range 200", "overchargeText": "2x fire rate", "health": 60},
+    {"id": "sprinkler", "name": "Sprinkler", "badge": "SP", "kind": "sprinkler", "cost": 60, "unlockHole": 2, "color": "0xFF4FC3F7", "stats": {"radius": 120, "slow": 0.3, "wet": 3}, "text": "Radius 120, slows 30%, wets 3 s", "overchargeText": "Radius +50%", "health": 70},
+    {"id": "sand_trap", "name": "Sand Trap", "badge": "ST", "kind": "sandTrap", "cost": 40, "unlockHole": 3, "color": "0xFFD7B56D", "stats": {"snare": 1, "zoneHeight": 60}, "text": "Zone in front of its column, snare 1 s per enemy", "overchargeText": "Snare 2 s", "health": 90},
+    {"id": "cannon", "name": "Cart Cannon", "badge": "CC", "kind": "cartCannon", "cost": 120, "unlockHole": 4, "color": "0xFF8E24AA", "stats": {"damage": 40, "interval": 3, "blast": 50, "range": 320}, "text": "40 damage every 3 s, blast 50, range 320", "overchargeText": "Instant reload, then 2x rate", "health": 100},
+    {"id": "tesla", "name": "Tee-Tesla", "badge": "TT", "kind": "teeTesla", "cost": 110, "unlockHole": 6, "color": "0xFFFFEB3B", "stats": {"damage": 15, "interval": 1.5, "chains": 3, "range": 180, "chainRange": 90, "wetBonus": 0.5, "overchargeChains": 6}, "text": "15 damage every 1.5 s, 3 chains, range 180; +50% on wet", "overchargeText": "6 chains", "health": 80},
+    {"id": "ripper", "name": "Lawnmower Ripper", "badge": "LR", "kind": "ripper", "cost": 90, "unlockHole": 7, "color": "0xFFE53935", "stats": {"dps": 20, "reach": 40}, "frontRowOnly": true, "text": "20 damage/s within 40 of the tee box edge, front row only", "overchargeText": "2x damage", "health": 120},
+    {"id": "sniper", "name": "Caddie Sniper", "badge": "CS", "kind": "sniper", "cost": 130, "unlockHole": 8, "color": "0xFF43A047", "stats": {"damage": 60, "interval": 2.5, "mark": 0.25, "markSeconds": 4}, "text": "60 damage every 2.5 s, whole screen", "overchargeText": "Marks target: +25% damage taken", "health": 60},
+    {"id": "snack_shack", "name": "Snack Shack", "badge": "SS", "kind": "snackShack", "cost": 100, "unlockHole": 9, "color": "0xFFFF8A65", "stats": {"heal": 2, "adjacentRate": 0.15, "swingCooldown": 0.3}, "text": "Heals the ball and adjacent towers 2/s, adjacent towers +15% rate", "overchargeText": "Swing cooldown -30%", "health": 80}
+  ]
+}

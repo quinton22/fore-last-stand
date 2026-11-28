@@ -44,6 +44,12 @@ class SettingsScreen extends StatelessWidget {
                 value: s.screenShake,
                 onChanged: (v) => store.update((p) => p.settings.screenShake = v),
               ),
+              SwitchListTile(
+                title: const Text('Test ads'),
+                subtitle: const Text('Story Mode: a 3-second stand-in for rewarded ads (revive and boost). No real ads are shown.'),
+                value: s.testAds,
+                onChanged: (v) => store.update((p) => p.settings.testAds = v),
+              ),
               ListTile(
                 title: const Text('Show welcome tips again'),
                 subtitle: const Text('Brings back the Home intro and restarts the Driving Range tutorial'),

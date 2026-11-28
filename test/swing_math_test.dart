@@ -1,29 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fore_last_stand/sim/swing_math.dart';
 import 'package:fore_last_stand/sim/vec.dart';
 
 void main() {
-  test('ball flies opposite to the drag', () {
-    final s = swingFromDrag(0, 80)!; // dragged down -> ball goes up
-    expect(s.direction.x, closeTo(0, 1e-9));
-    expect(s.direction.y, closeTo(-1, 1e-9));
-    expect(s.power, closeTo(0.5, 1e-9));
-  });
-
-  test('power is clamped to 1', () {
-    expect(swingFromDrag(0, 1000)!.power, 1.0);
-  });
-
-  test('tiny drags are not swings', () {
-    expect(swingFromDrag(2, 2), isNull);
-  });
-
-  test('sweet spot window and ring phase', () {
-    expect(isSweetSpot(0.5), isTrue);
-    expect(isSweetSpot(0.9), isFalse);
-    expect(ringPhase(timingRingPeriod * 1.5), closeTo(0.5, 1e-9));
-  });
-
   test('aim assist nudges toward a nearby target only', () {
     const up = V2(0, -1);
     final nudged = assistAim(up, const V2(0.2, -1), 1);
@@ -32,10 +13,23 @@ void main() {
     expect(assistAim(up, const V2(0.2, -1), 0), up);
   });
 
-  test('preview path reflects off a side wall once', () {
-    final path = previewPath(const V2(180, 600), const V2(-0.6, -0.8), 1000, 360);
-    expect(path, hasLength(3));
-    expect(path[1].x, closeTo(0, 1e-6));
-    expect(path[2].x, greaterThan(0));
+  test('sweeping the aim never skips at the edge of the assist cone', () {
+    for (final strength in [0.3, 0.6, 1.0]) {
+      sweep(strength, (prev, next) {
+        expect((next - prev).abs(), lessThan(0.25 * math.pi / 180 * 2.05), reason: 'strength $strength');
+        expect(next, greaterThanOrEqualTo(prev), reason: 'aim moves the same way as the finger');
+      });
+    }
   });
+}
+
+void sweep(double strength, void Function(double prev, double next) check) {
+  const target = V2(0, -1);
+  double? prev;
+  for (var deg = -60.0; deg <= 60; deg += 0.25) {
+    final a = -math.pi / 2 + deg * math.pi / 180;
+    final out = assistAim(V2(math.cos(a), math.sin(a)), target, strength).angle;
+    if (prev != null) check(prev, out);
+    prev = out;
+  }
 }

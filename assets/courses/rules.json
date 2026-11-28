@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "rounds": [
+    {
+      "waves": 3,
+      "boss": "mini"
+    },
+    {
+      "waves": 4,
+      "boss": "mini"
+    },
+    {
+      "waves": 5,
+      "boss": "final"
+    }
+  ],
+  "teeBox": {
+    "health": 100,
+    "flags": 3,
+    "flagRestoreHealth": 30,
+    "budgetPerLostFlag": 0.15,
+    "flagGrace": 1.5
+  },
+  "coins": {
+    "holeStart": 150,
+    "replayStart": 150,
+    "sellRefund": 0.7
+  },
+  "xp": {
+    "rankMax": 18,
+    "base": 100,
+    "perRank": 60,
+    "roundBase": 100,
+    "roundPerHole": 10,
+    "lossFraction": 0.25,
+    "replayFraction": 0.5
+  },
+  "tokens": {
+    "roundBase": 20,
+    "roundPerHole": 5,
+    "lossFraction": 0.25,
+    "replayFraction": 0.5,
+    "tierPrices": {
+      "old": 40,
+      "used": 70,
+      "new": 120,
+      "special": 200
+    },
+    "levelCosts": [
+      30,
+      50,
+      70,
+      90
+    ],
+    "levelDamage": 0.08,
+    "maxLevelCooldownCut": 0.1
+  },
+  "tiers": {
+    "old": 1.0,
+    "used": 1.2,
+    "new": 1.45,
+    "special": 1.6
+  },
+  "swing": {
+    "minDrag": 24,
+    "maxDrag": 120,
+    "minPower": 0.35,
+    "towerDragThreshold": 12,
+    "longPressSeconds": 0.4,
+    "ringStart": 48,
+    "ringEnd": 16,
+    "ringPeriod": 0.7,
+    "sweetOuter": 24,
+    "sweetDamage": 0.5,
+    "sweetPierce": 1
+  },
+  "combo": {
+    "names": [
+      "Bogey",
+      "Par",
+      "Birdie",
+      "Eagle",
+      "Albatross"
+    ],
+    "multipliers": [
+      1.0,
+      1.1,
+      1.25,
+      1.5,
+      2.0
+    ]
+  },
+  "fore": {
+    "max": 100,
+    "perHit": 4,
+    "perSweetHit": 8,
+    "balls": 20,
+    "seconds": 3,
+    "fanDegrees": 90,
+    "damage": 0.5
+  },
+  "waves": {
+    "budgetBase": 10,
+    "perHole": 0.12,
+    "perRound": 0.15,
+    "perWave": 0.1,
+    "spawnInterval": 0.8,
+    "hpPerHole": 0.08,
+    "buildBreak": 8
+  },
+  "miniBoss": {
+    "size": 1.6,
+    "hp": 8,
+    "damage": 3,
+    "coins": 5
+  },
+  "finalBoss": {
+    "speed": 20,
+    "damage": 40,
+    "hpPerHole": 0.08,
+    "radius": 26,
+    "coins": 50
+  },
+  "towers": {
+    "levelCosts": [
+      0.75,
+      1.25
+    ],
+    "levelStrength": 0.4
+  },
+  "overcharge": {
+    "seconds": 3,
+    "flagLifetime": 7,
+    "flagMinGap": 8,
+    "flagMaxGap": 14,
+    "flagRadius": 10
+  },
+  "caddies": {
+    "rankStep": 0.1,
+    "rankCosts": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "clubhouse": [
+    {
+      "id": "snackBar",
+      "name": "Snack Bar",
+      "description": "+25 starting coins on each new hole",
+      "perTier": 25,
+      "costs": [
+        40,
+        80,
+        120
+      ]
+    },
+    {
+      "id": "greenskeeping",
+      "name": "Greenskeeping",
+      "description": "+20 tee box health per flag",
+      "perTier": 20,
+      "costs": [
+        40,
+        80,
+        120
+      ]
+    },
+    {
+      "id": "lockerRoom",
+      "name": "Locker Room",
+      "description": "+1 perk reroll per hole",
+      "perTier": 1,
+      "costs": [
+        40,
+        80,
+        120
+      ]
+    },
+    {
+      "id": "grounds",
+      "name": "Grounds Crew",
+      "description": "+1 tower spot in the front row",
+      "perTier": 1,
+      "costs": [
+        30,
+        60,
+        90,
+        120,
+        150,
+        180
+      ]
+    }
+  ],
+  "perks": {
+    "choices": 3,
+    "freeRerolls": 1
+  },
+  "ads": {
+    "reviveClearRadius": 150,
+    "boosts": [
+      {
+        "id": "club_damage",
+        "name": "Club damage +25% for the round",
+        "value": 0.25
+      },
+      {
+        "id": "full_fore",
+        "name": "Start with a full Fore! meter",
+        "value": 100
+      },
+      {
+        "id": "coins",
+        "name": "75 coins",
+        "value": 75
+      }
+    ]
+  },
+  "pathfinding": {
+    "cell": 15,
+    "sandCost": 1.4,
+    "obstacleMargin": 8
+  },
+  "hazards": {
+    "sandSlow": 0.3
+  },
+  "attack": {
+    "interval": 1,
+    "bossInterval": 2,
+    "towerReach": 22,
+    "bomberReach": 60
+  },
+  "arcade": {
+    "startCoins": 150,
+    "endlessMiniEvery": 5,
+    "endlessBossEvery": 10,
+    "endlessDraftEvery": 3,
+    "endlessBudgetPerWave": 0.12,
+    "endlessHpPerWave": 0.04
+  }
+}

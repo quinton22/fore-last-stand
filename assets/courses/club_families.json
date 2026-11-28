@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "families": [
+    {"id": "iron", "name": "Iron", "damage": 20, "speed": 700, "cooldown": 0.8, "range": 565, "pierce": 0, "bounces": 2, "hitsFliers": true, "motion": "arc", "behavior": "Arc, bounces 2 times"},
+    {"id": "wood", "name": "Fairway Wood", "damage": 24, "speed": 800, "cooldown": 0.9, "range": 620, "pierce": 1, "bounces": 1, "hitsFliers": true, "motion": "straight", "behavior": "Pierces 1, bounces 1"},
+    {"id": "driver", "name": "Driver", "damage": 30, "speed": 1000, "cooldown": 1.1, "range": 700, "pierce": 3, "bounces": 0, "hitsFliers": true, "motion": "straight", "behavior": "Straight, pierces 3, hits fliers"},
+    {"id": "wedge", "name": "Wedge", "damage": 28, "speed": 450, "cooldown": 1.2, "range": 485, "pierce": 0, "bounces": 0, "hitsFliers": false, "motion": "lob", "blastRadius": 60, "behavior": "Lob over obstacles, blast radius 60"},
+    {"id": "putter", "name": "Putter", "damage": 14, "speed": 350, "cooldown": 0.9, "range": 510, "pierce": 9, "bounces": 0, "hitsFliers": false, "motion": "roll", "behavior": "Ground roll, hits up to 10, misses fliers"}
+  ]
+}

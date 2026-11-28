@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "perks": [
+    {"id": "extra_bounce", "name": "Extra Bounce", "text": "Balls bounce 1 extra time", "effect": "extraBounce", "value": 1},
+    {"id": "extra_pierce", "name": "Piercing Shot", "text": "Balls pierce 1 extra enemy", "effect": "extraPierce", "value": 1},
+    {"id": "club_damage", "name": "Heavy Balls", "text": "Club damage +15%", "effect": "clubDamage", "value": 0.15},
+    {"id": "club_cooldown", "name": "Quick Hands", "text": "Club cooldown -12%", "effect": "clubCooldown", "value": 0.12},
+    {"id": "sweet_width", "name": "Wide Sweet Spot", "text": "Sweet Spot zone 25% wider", "effect": "sweetWidth", "value": 0.25},
+    {"id": "sweet_damage", "name": "Pure Strike", "text": "Sweet Spot damage +25% more", "effect": "sweetDamage", "value": 0.25},
+    {"id": "fore_charge", "name": "Meter Maven", "text": "Fore! meter fills 30% faster", "effect": "foreCharge", "value": 0.3},
+    {"id": "fore_balls", "name": "Fore! Fan", "text": "Fore! burst fires 8 more balls", "effect": "foreBalls", "value": 8},
+    {"id": "boss_damage", "name": "Giant Killer", "text": "Boss damage +20%", "effect": "bossDamage", "value": 0.2},
+    {"id": "blast_radius", "name": "Big Bang", "text": "Wedge and Cannon blasts +25% radius", "effect": "blastRadius", "value": 0.25},
+    {"id": "tower_damage", "name": "Overclocked", "text": "Towers +15% damage", "effect": "towerDamage", "value": 0.15},
+    {"id": "tower_range", "name": "Long Sight", "text": "Towers +20% range", "effect": "towerRange", "value": 0.2},
+    {"id": "tower_cost", "name": "Member Discount", "text": "Towers cost 20% less", "effect": "towerCost", "value": 0.2},
+    {"id": "overcharge", "name": "Long Tag", "text": "Overcharge lasts 2 s longer", "effect": "overchargeSeconds", "value": 2},
+    {"id": "tee_health", "name": "Groundskeeper", "text": "Tee box health +30", "effect": "teeHealth", "value": 30},
+    {"id": "wave_heal", "name": "Halfway House", "text": "Heal 15 after each wave", "effect": "waveHeal", "value": 15},
+    {"id": "coin_gain", "name": "Deep Pockets", "text": "Coins from kills +20%", "effect": "coinGain", "value": 0.2},
+    {"id": "coins_now", "name": "Sponsor Check", "text": "60 coins now", "effect": "coinsNow", "value": 60},
+    {"id": "enemy_slow", "name": "Wet Fairways", "text": "Enemies 8% slower", "effect": "enemySlow", "value": 0.08},
+    {"id": "sprinkler_heal", "name": "Healing Mist", "text": "Sprinklers also heal 1/s", "effect": "sprinklerHeal", "value": 1}
+  ]
+}
